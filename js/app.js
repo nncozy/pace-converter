@@ -29,6 +29,7 @@
   const resetBtn = document.getElementById('reset-btn');
   const themeToggleBtn = document.getElementById('theme-toggle-btn');
   const editDistancesBtn = document.getElementById('edit-distances-btn');
+  const paceSummaryValue = document.getElementById('pace-summary-value');
 
   // 現在の基準ペース（ms/m）。未入力なら null。
   let currentPace = null;
@@ -37,7 +38,7 @@
   // ---------- 距離リストの永続化 ----------
 
   function cloneDefaults() {
-    return DEFAULT_METERS.map((meters) => ({ meters, custom: false, visible: true }));
+    return DEFAULT_METERS.map((meters, i) => ({ meters, custom: false, visible: true, order: i }));
   }
 
   function loadDistances() {
@@ -46,14 +47,21 @@
       if (!raw) return cloneDefaults();
       const parsed = JSON.parse(raw);
       if (!Array.isArray(parsed) || parsed.length === 0) return cloneDefaults();
-      const cleaned = parsed
+      let cleaned = parsed
         .filter((d) => d && Number.isFinite(d.meters) && d.meters > 0)
         .map((d) => ({
           meters: Math.round(d.meters),
           custom: !!d.custom,
           visible: d.visible !== false,
+          order: Number.isFinite(d.order) ? d.order : null,
         }));
-      return cleaned.length ? cleaned : cloneDefaults();
+      if (!cleaned.length) return cloneDefaults();
+      // 表示順(order)を持たない古いデータからの移行: これまで通り距離の昇順を初期順にする
+      if (cleaned.some((d) => d.order === null)) {
+        cleaned = cleaned.slice().sort((a, b) => a.meters - b.meters);
+        cleaned.forEach((d, i) => { d.order = i; });
+      }
+      return cleaned;
     } catch (e) {
       return cloneDefaults();
     }
@@ -68,11 +76,27 @@
   }
 
   function sortedDistances() {
+    return distances.slice().sort((a, b) => a.order - b.order);
+  }
+
+  function sortedByMeters() {
     return distances.slice().sort((a, b) => a.meters - b.meters);
   }
 
   function visibleDistances() {
     return sortedDistances().filter((d) => d.visible);
+  }
+
+  // ドラッグ&ドロップで確定した表示順(距離のmeters配列)を永続化する。
+  // 非表示中の距離は今回のドラッグ対象外なので、既存の並びを保ったまま末尾に付け直す。
+  function persistVisibleOrder(orderedMeters) {
+    orderedMeters.forEach((meters, i) => {
+      const d = distances.find((x) => x.meters === meters);
+      if (d) d.order = i;
+    });
+    const hidden = distances.filter((d) => !d.visible).sort((a, b) => a.order - b.order);
+    hidden.forEach((d, i) => { d.order = orderedMeters.length + i; });
+    saveDistances();
   }
 
   function altLabel(meters) {
@@ -89,7 +113,8 @@
     if (distances.some((d) => d.meters === meters)) {
       return { ok: false, error: 'その距離はすでに追加されています' };
     }
-    distances.push({ meters, custom: true, visible: true });
+    const maxOrder = distances.reduce((m, d) => Math.max(m, d.order), -1);
+    distances.push({ meters, custom: true, visible: true, order: maxOrder + 1 });
     saveDistances();
     return { ok: true };
   }
@@ -111,6 +136,19 @@
 
   function pad2(n) {
     return String(Math.max(0, n)).padStart(2, '0');
+  }
+
+  // 現在の基準ペース(ms/m)を「4'00"」のようなkmあたりの表示に整形する
+  function updatePaceSummary() {
+    if (currentPace === null) {
+      paceSummaryValue.textContent = `--'--"`;
+      return;
+    }
+    // ms/m と s/km は数値として同じ(×1000してから÷1000するだけなので)
+    const totalSec = Math.round(currentPace);
+    const min = Math.floor(totalSec / 60);
+    const sec = totalSec % 60;
+    paceSummaryValue.textContent = `${min}'${pad2(sec)}"`;
   }
 
   function renderCards() {
@@ -135,11 +173,21 @@
       card.dataset.distance = String(meters);
 
       const header = document.createElement('div');
-      header.className = 'flex items-baseline justify-center gap-1.5 mb-2';
+      header.className = 'flex items-center gap-2 mb-2';
       header.innerHTML = `
-        <span class="font-extrabold text-lime-600 dark:text-lime-400 text-lg">${meters.toLocaleString('ja-JP')}</span>
-        <span class="text-xs text-neutral-500 dark:text-neutral-500 font-normal">m</span>
-        ${alt ? `<span class="text-[10px] text-neutral-400 dark:text-neutral-600 font-normal ml-1">(${alt})</span>` : ''}
+        <button type="button" class="drag-handle shrink-0 w-7 h-7 flex items-center justify-center rounded-full text-neutral-400 dark:text-neutral-600 touch-none cursor-grab active:cursor-grabbing" aria-label="${meters}mを並び替え" data-distance="${meters}">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
+            <circle cx="9" cy="6" r="1.6"></circle><circle cx="15" cy="6" r="1.6"></circle>
+            <circle cx="9" cy="12" r="1.6"></circle><circle cx="15" cy="12" r="1.6"></circle>
+            <circle cx="9" cy="18" r="1.6"></circle><circle cx="15" cy="18" r="1.6"></circle>
+          </svg>
+        </button>
+        <div class="flex-1 flex items-baseline justify-center gap-1.5">
+          <span class="font-extrabold text-lime-600 dark:text-lime-400 text-lg">${meters.toLocaleString('ja-JP')}</span>
+          <span class="text-xs text-neutral-500 dark:text-neutral-500 font-normal">m</span>
+          ${alt ? `<span class="text-[10px] text-neutral-400 dark:text-neutral-600 font-normal ml-1">(${alt})</span>` : ''}
+        </div>
+        <span class="w-7 h-7 shrink-0" aria-hidden="true"></span>
       `;
       card.appendChild(header);
 
@@ -248,6 +296,7 @@
     const totalMs = distanceToMs(sourceDistance);
     const pace = totalMs / sourceDistance; // ms / m
     currentPace = pace;
+    updatePaceSummary();
 
     visibleDistances().forEach(({ meters }) => {
       if (meters === sourceDistance) return;
@@ -348,6 +397,118 @@
     if (document.activeElement && document.activeElement.classList.contains('pace-input')) {
       document.activeElement.blur();
     }
+    updatePaceSummary();
+  }
+
+  // ---------- カードの並び替え(ドラッグ&ドロップ) ----------
+
+  let dragCard = null;
+  let dragPlaceholder = null;
+  let dragPointerId = null;
+  let dragOffsetX = 0;
+  let dragOffsetY = 0;
+  let dragCardHeight = 0;
+
+  function onDragPointerDown(e) {
+    if (dragCard) return; // 既にドラッグ中なら多重開始しない
+    const handle = e.target.closest('.drag-handle');
+    if (!handle) return;
+    // 1本指のみ対象(ピンチ操作などとの競合を避ける)
+    if (e.pointerType === 'touch' && e.isPrimary === false) return;
+
+    const card = handle.closest('.distance-card');
+    if (!card) return;
+    e.preventDefault();
+
+    const rect = card.getBoundingClientRect();
+    dragCard = card;
+    dragPointerId = e.pointerId;
+    dragOffsetX = e.clientX - rect.left;
+    dragOffsetY = e.clientY - rect.top;
+    dragCardHeight = rect.height;
+
+    dragPlaceholder = document.createElement('div');
+    dragPlaceholder.className =
+      'rounded-2xl border-2 border-dashed border-lime-600/30 dark:border-lime-400/30';
+    dragPlaceholder.style.height = `${rect.height}px`;
+    card.parentNode.insertBefore(dragPlaceholder, card);
+
+    card.style.position = 'fixed';
+    card.style.left = `${rect.left}px`;
+    card.style.top = `${rect.top}px`;
+    card.style.width = `${rect.width}px`;
+    card.style.zIndex = '1000';
+    card.style.pointerEvents = 'none';
+    card.classList.add('dragging-card');
+    document.body.classList.add('dragging');
+    document.body.appendChild(card);
+
+    try {
+      handle.setPointerCapture(e.pointerId);
+    } catch (err) {}
+
+    handle.addEventListener('pointermove', onDragPointerMove);
+    handle.addEventListener('pointerup', onDragPointerEnd);
+    handle.addEventListener('pointercancel', onDragPointerEnd);
+  }
+
+  function onDragPointerMove(e) {
+    if (!dragCard || e.pointerId !== dragPointerId) return;
+    e.preventDefault();
+
+    const x = e.clientX - dragOffsetX;
+    const y = e.clientY - dragOffsetY;
+    dragCard.style.left = `${x}px`;
+    dragCard.style.top = `${y}px`;
+
+    const dragCenterY = y + dragCardHeight / 2;
+    const siblings = Array.from(listEl.children).filter(
+      (el) => el !== dragPlaceholder && el !== dragCard && el.classList.contains('distance-card')
+    );
+
+    let target = null;
+    for (const sib of siblings) {
+      const r = sib.getBoundingClientRect();
+      if (dragCenterY < r.top + r.height / 2) {
+        target = sib;
+        break;
+      }
+    }
+    if (target) {
+      if (dragPlaceholder.nextSibling !== target) listEl.insertBefore(dragPlaceholder, target);
+    } else if (listEl.lastElementChild !== dragPlaceholder) {
+      listEl.appendChild(dragPlaceholder);
+    }
+  }
+
+  function onDragPointerEnd(e) {
+    if (!dragCard || e.pointerId !== dragPointerId) return;
+    const handle = dragCard.querySelector('.drag-handle');
+    if (handle) {
+      handle.removeEventListener('pointermove', onDragPointerMove);
+      handle.removeEventListener('pointerup', onDragPointerEnd);
+      handle.removeEventListener('pointercancel', onDragPointerEnd);
+    }
+
+    dragPlaceholder.parentNode.insertBefore(dragCard, dragPlaceholder);
+    dragPlaceholder.remove();
+    dragCard.style.position = '';
+    dragCard.style.left = '';
+    dragCard.style.top = '';
+    dragCard.style.width = '';
+    dragCard.style.zIndex = '';
+    dragCard.style.pointerEvents = '';
+    dragCard.classList.remove('dragging-card');
+    document.body.classList.remove('dragging');
+
+    const newOrder = Array.from(listEl.querySelectorAll('.distance-card')).map((c) =>
+      Number(c.dataset.distance)
+    );
+    persistVisibleOrder(newOrder);
+
+    dragCard = null;
+    dragPlaceholder = null;
+    dragPointerId = null;
   }
 
   // ---------- テーマ切り替え ----------
@@ -458,7 +619,7 @@
 
   function renderModalList() {
     modalList.innerHTML = '';
-    sortedDistances().forEach(({ meters, visible, custom }) => {
+    sortedByMeters().forEach(({ meters, visible, custom }) => {
       const alt = altLabel(meters);
       const row = document.createElement('label');
       row.className =
@@ -523,10 +684,12 @@
 
   function init() {
     renderCards();
+    updatePaceSummary();
     listEl.addEventListener('input', onInput);
     listEl.addEventListener('keydown', onKeydown);
     listEl.addEventListener('focusin', onFocusIn);
     listEl.addEventListener('focusout', onFocusOut);
+    listEl.addEventListener('pointerdown', onDragPointerDown);
     resetBtn.addEventListener('click', resetAll);
 
     initTheme();

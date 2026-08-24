@@ -39,16 +39,35 @@
 - `manifest.webmanifest` とアイコン一式により、iOS/Androidのホーム画面に追加した際にアプリらしいアイコンで表示されます
 - SNSやチャットにURLを貼った際は、OGP画像（`icons/og-image.png`）付きのプレビューが表示されます
 
+### km/mile のペース表示
+
+入力欄の上に「4'00" / km」のようなペースサマリーを常時表示します。何かを入力するたびに更新され、リセットすると `--'--"` に戻ります。
+
+### オフライン対応（Service Worker）
+
+`service-worker.js` がアプリ本体（HTML/CSS/JS/アイコン）と、外部から読み込んでいる
+Tailwind CDNのスクリプトをキャッシュします。一度開いておけば、電波の届かない場所
+でもアプリを起動できます。ホーム画面に追加した状態での利用と特に相性が良い機能です。
+
+### 距離カードの並び替え
+
+各カード左上の「⠿」ハンドルを長押し（またはクリック）してドラッグすると、距離の
+表示順を自由に入れ替えられます。並び順もブラウザの `localStorage` に保存されます。
+非表示中の距離は編集モーダル内では距離の昇順で表示されます（並び替えの対象はメイン
+画面に表示中の距離のみ）。
+
 ## 技術構成
 
 - 静的HTML / CSS / JavaScript（ビルド不要、サーバー・データベース不要）
 - スタイリングは [Tailwind CSS](https://tailwindcss.com/)（CDN経由、`darkMode: 'class'` でテーマ切り替えに対応）
-- 距離設定・テーマ設定はブラウザの `localStorage` に保存
+- 距離設定・並び順・テーマ設定はブラウザの `localStorage` に保存
+- オフライン対応は `service-worker.js`（Service Worker）で実現
 - 依存パッケージなし
 
 ```
 pace-calculator/
 ├── index.html
+├── service-worker.js
 ├── manifest.webmanifest
 ├── favicon.svg
 ├── favicon.ico
@@ -87,3 +106,9 @@ python3 -m http.server 8000
 これらのファイルを更新してデプロイする際は、`index.html` 内の2箇所の `?v=N` を
 インクリメントしてください。バージョンを変えないと、訪問者のブラウザ（や途中の
 キャッシュ・プロキシ）が古いファイルを使い続け、変更が反映されないことがあります。
+
+Service Worker（`service-worker.js`）でもオフライン用にファイルをキャッシュしている
+ため、`index.html` / `css/style.css` / `js/app.js` のいずれかを更新したら、
+`service-worker.js` 内の `CACHE_VERSION` と `PRECACHE_URLS` の `?v=N` も同じ番号に
+合わせて更新してください。ここがズレると、Service Worker側だけ古いキャッシュを
+配信し続けてしまいます。

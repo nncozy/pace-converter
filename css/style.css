@@ -55,6 +55,23 @@ body.modal-open {
   overflow: hidden;
 }
 
+/* Distance card drag-to-reorder */
+.drag-handle {
+  touch-action: none;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+body.dragging {
+  overflow: hidden;
+  -webkit-user-select: none;
+  user-select: none;
+}
+.dragging-card {
+  box-shadow: 0 20px 40px -8px rgba(0, 0, 0, 0.35);
+  transform: scale(1.02);
+}
+
 /* Gentle entrance for the main content on first paint */
 @keyframes fade-in-up {
   from {

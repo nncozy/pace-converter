@@ -4,6 +4,7 @@
   const STORAGE_KEYS = {
     distances: 'paceConverter.distances.v1',
     theme: 'paceConverter.theme',
+    vdotRace: 'paceConverter.vdotRace.v1',
   };
 
   const DEFAULT_METERS = [50, 200, 400, 800, 1000, 1500, 3000, 5000, 10000];
@@ -31,6 +32,7 @@
   const editDistancesBtn = document.getElementById('edit-distances-btn');
   const paceMinInput = document.getElementById('pace-min-input');
   const paceSecInput = document.getElementById('pace-sec-input');
+  const vdotBtn = document.getElementById('vdot-btn');
 
   // 現在の基準ペース（ms/m）。未入力なら null。
   let currentPace = null;
@@ -827,6 +829,392 @@
     document.body.classList.remove('modal-open');
   }
 
+  // ---------- VDOT / トレーニングペース ----------
+  //
+  // Jack Daniels & Jimmy Gilbert の式（Oxygen Power, 1979）でレース実績から
+  // VDOT（フィットネス指標）を算出し、同じ式を逆算してトレーニングペース
+  // ゾーンごとの目安ペースを求める。ゾーンの%VO2max値(0.70/0.84/0.88/0.98/1.05)
+  // は、公開されているVDOT換算表の実測値（例: VDOT50でE 5'07"/km, M 4'25"/km,
+  // T 4'15"/km, I 3'54"/km, R 3'41"/km）と一致することを確認済み。
+
+  // プリセットは10km以下のレース距離のみ（ハーフ/フルは想定利用者の対象外のため入れない。
+  // 必要なら「その他」から自由入力できる）
+  const VDOT_PRESET_DISTANCES = [
+    { meters: 1500, label: '1500m' },
+    { meters: 1609, label: '1マイル (1609m)' },
+    { meters: 3000, label: '3000m' },
+    { meters: 5000, label: '5000m' },
+    { meters: 10000, label: '10000m' },
+  ];
+
+  const TRAINING_ZONES = [
+    {
+      key: 'E',
+      label: 'イージー / LSD',
+      desc: '楽に会話できるペース。有酸素の土台作り',
+      pct: 0.70,
+      hint: '会話ができるくらい余裕のあるペース。練習の大部分（週の7〜8割くらい）はこの強度で十分です。30分〜2時間ほど、息が弾みすぎない範囲でゆっくり走りましょう。',
+    },
+    {
+      key: 'M',
+      label: 'マラソン',
+      desc: 'フルマラソンのレースペースの目安',
+      pct: 0.84,
+      hint: 'フルマラソンを走るときの目標ペースです。10kmまでしか出ない場合でも、「ちょっと頑張る」持続走（20〜60分ほど）の強度の目安として使えます。',
+    },
+    {
+      key: 'T',
+      label: '閾値走',
+      desc: '「ややきつい」を1時間ほど保てるペース',
+      pct: 0.88,
+      hint: 'きついけど一言二言なら会話できる強度。乳酸がたまり始める境目を押し上げる練習です。20分間走り続けるか、5〜10分の反復を短い休憩（1〜2分のジョグ）を挟んで数本行うのがおすすめ。合計20〜40分くらいが目安です。',
+    },
+    {
+      key: 'I',
+      label: 'インターバル',
+      desc: 'VO2maxを鍛える高強度ペース',
+      pct: 0.98,
+      hint: 'きついが全力ではない強度。3〜5分ほど走って、同じくらいの時間のジョグで回復、を繰り返します（例: 1000mを5本、間はジョグで2〜3分）。フォームが崩れるほど追い込まず、余裕がなくなったら本数を減らして大丈夫です。',
+    },
+    {
+      key: 'R',
+      label: 'レペティション',
+      desc: 'フォームとスピードを鍛える全力に近いペース',
+      pct: 1.05,
+      hint: '速いフォームとスピード感を養うための短い反復走です。200〜400mほどを、しっかり休んで（反復と同じか長めのジョグ・レスト）繰り返します。追い込む練習ではないので、疲れすぎない本数に留めましょう。',
+    },
+  ];
+
+  function vo2FromVelocity(v) {
+    // vは m/min
+    return -4.6 + 0.182258 * v + 0.000104 * v * v;
+  }
+
+  function percentVO2Max(tMin) {
+    return (
+      0.8 +
+      0.1894393 * Math.exp(-0.012778 * tMin) +
+      0.2989558 * Math.exp(-0.1932605 * tMin)
+    );
+  }
+
+  function vdotFromPerformance(meters, totalSec) {
+    const tMin = totalSec / 60;
+    const v = meters / tMin; // m/min
+    return vo2FromVelocity(v) / percentVO2Max(tMin);
+  }
+
+  // vo2FromVelocity(v) = vo2 を v について解く（2次方程式の解の公式）
+  function velocityFromVO2(vo2) {
+    const a = 0.000104;
+    const b = 0.182258;
+    const c = -(4.6 + vo2);
+    const discriminant = b * b - 4 * a * c;
+    if (discriminant < 0) return null;
+    return (-b + Math.sqrt(discriminant)) / (2 * a); // m/min
+  }
+
+  function trainingPaceSecPerKm(vdot, pct) {
+    const v = velocityFromVO2(vdot * pct);
+    if (!v || v <= 0) return null;
+    return (1000 / v) * 60;
+  }
+
+  function formatPaceSecPerKm(sec) {
+    if (sec === null || !Number.isFinite(sec)) return '--\'--"';
+    const total = Math.round(sec);
+    const m = Math.floor(total / 60);
+    const s = total % 60;
+    return `${m}'${pad2(s)}"`;
+  }
+
+  function loadVdotRace() {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEYS.vdotRace);
+      if (!raw) return null;
+      const parsed = JSON.parse(raw);
+      if (!parsed || !Number.isFinite(parsed.meters) || parsed.meters <= 0) return null;
+      if (!Number.isFinite(parsed.totalMs) || parsed.totalMs <= 0) return null;
+      return parsed;
+    } catch (e) {
+      return null;
+    }
+  }
+
+  function saveVdotRace(meters, totalMs) {
+    try {
+      localStorage.setItem(STORAGE_KEYS.vdotRace, JSON.stringify({ meters, totalMs }));
+    } catch (e) {
+      // 保存できなくても計算自体は継続させる
+    }
+  }
+
+  let vdotModalOverlay,
+    vdotDistanceSelect,
+    vdotCustomWrap,
+    vdotCustomInput,
+    vdotHhInput,
+    vdotMmInput,
+    vdotSsInput,
+    vdotCsInput,
+    vdotResultEl;
+
+  function vdotTimeInputs() {
+    return [vdotHhInput, vdotMmInput, vdotSsInput, vdotCsInput];
+  }
+
+  function setVdotField(unit, value) {
+    vdotTimeInputs()[UNITS.indexOf(unit)].value = pad2(value);
+  }
+
+  function getVdotDistanceMeters() {
+    const raw = vdotDistanceSelect.value === 'custom' ? vdotCustomInput.value : vdotDistanceSelect.value;
+    const v = parseInt(raw, 10);
+    return Number.isFinite(v) && v > 0 ? v : null;
+  }
+
+  function getVdotTimeMs() {
+    const hh = parseInt(vdotHhInput.value, 10) || 0;
+    const mm = parseInt(vdotMmInput.value, 10) || 0;
+    const ss = parseInt(vdotSsInput.value, 10) || 0;
+    const cs = parseInt(vdotCsInput.value, 10) || 0;
+    return (hh * 3600 + mm * 60 + ss) * 1000 + cs * 10;
+  }
+
+  function recalcVdot() {
+    const meters = getVdotDistanceMeters();
+    const totalMs = getVdotTimeMs();
+    const zonePaceEls = TRAINING_ZONES.map((z) =>
+      vdotModalOverlay.querySelector(`.vdot-zone-pace[data-zone="${z.key}"]`)
+    );
+
+    if (!meters || totalMs <= 0) {
+      vdotResultEl.textContent = '--';
+      zonePaceEls.forEach((el) => { el.textContent = '--\'--"'; });
+      return;
+    }
+
+    const vdot = vdotFromPerformance(meters, totalMs / 1000);
+    vdotResultEl.textContent = vdot.toFixed(1);
+    TRAINING_ZONES.forEach((z, i) => {
+      zonePaceEls[i].textContent = formatPaceSecPerKm(trainingPaceSecPerKm(vdot, z.pct));
+    });
+    saveVdotRace(meters, totalMs);
+  }
+
+  function onVdotDistanceChange() {
+    vdotCustomWrap.classList.toggle('hidden', vdotDistanceSelect.value !== 'custom');
+    recalcVdot();
+  }
+
+  function onVdotTimeInput(e) {
+    const input = e.target;
+    if (!input.classList.contains('vdot-time-input')) return;
+    let digits = input.value.replace(/[^0-9]/g, '');
+    if (digits.length > 2) digits = digits.slice(0, 2);
+    if (digits !== input.value) input.value = digits;
+
+    recalcVdot();
+
+    if (digits.length === 2) {
+      const inputs = vdotTimeInputs();
+      const idx = UNITS.indexOf(input.dataset.vdotUnit);
+      const next = inputs[idx + 1];
+      if (next) {
+        next.focus();
+        next.select();
+      } else {
+        input.blur();
+      }
+    }
+  }
+
+  function onVdotTimeKeydown(e) {
+    if (e.key !== 'Backspace') return;
+    const input = e.target;
+    if (!input.classList.contains('vdot-time-input')) return;
+    if (input.value !== '') return;
+
+    const inputs = vdotTimeInputs();
+    const idx = UNITS.indexOf(input.dataset.vdotUnit);
+    const prev = inputs[idx - 1];
+    if (prev) {
+      e.preventDefault();
+      prev.focus();
+      prev.select();
+    }
+  }
+
+  function onVdotTimeFocusOut(e) {
+    const input = e.target;
+    if (!input.classList.contains('vdot-time-input')) return;
+    const v = clampUnitValue(input.dataset.vdotUnit, parseInt(input.value, 10));
+    input.value = pad2(v);
+    recalcVdot();
+  }
+
+  function onVdotTimeFocusIn(e) {
+    if (e.target.classList.contains('vdot-time-input')) e.target.select();
+  }
+
+  function buildVdotModal() {
+    vdotModalOverlay = document.createElement('div');
+    vdotModalOverlay.id = 'vdot-modal-overlay';
+    vdotModalOverlay.className =
+      'fixed inset-0 z-50 hidden items-end sm:items-center justify-center bg-black/60 px-0 sm:px-4';
+    vdotModalOverlay.innerHTML = `
+      <div id="vdot-modal-panel" class="w-full sm:max-w-sm sm:rounded-3xl rounded-t-3xl bg-white/95 dark:bg-neutral-900/95 backdrop-blur-sm border border-lime-600/10 dark:border-lime-400/10 shadow-2xl shadow-lime-900/10 dark:shadow-black/50 p-4 max-h-[85vh] overflow-y-auto">
+        <div class="flex items-center justify-between mb-3">
+          <h2 class="text-base font-bold text-neutral-900 dark:text-white">VDOTトレーニングペース</h2>
+          <button id="vdot-modal-close" type="button" aria-label="閉じる"
+            class="w-8 h-8 flex items-center justify-center rounded-full text-neutral-500 dark:text-neutral-400 active:bg-neutral-100 dark:active:bg-neutral-800">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-5 h-5">
+              <line x1="18" y1="6" x2="6" y2="18"></line>
+              <line x1="6" y1="6" x2="18" y2="18"></line>
+            </svg>
+          </button>
+        </div>
+        <p class="text-xs text-neutral-500 dark:text-neutral-400 mb-1 leading-relaxed">直近のレース結果を入力すると、フィットネス指標「VDOT」と5つのトレーニングペースの目安を計算します。使わなくてもタイム換算機能は普通に使えます。</p>
+        <p class="text-[10px] text-neutral-400 dark:text-neutral-600 mb-3 leading-relaxed">各ペースの名前をタップすると、練習の目安ややり方が見られます。</p>
+
+        <label class="block text-xs font-semibold text-neutral-500 dark:text-neutral-400 mb-1">距離</label>
+        <select id="vdot-distance-select"
+          class="w-full bg-neutral-100 dark:bg-neutral-800 rounded-xl px-3 py-2 text-sm text-neutral-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-lime-600 dark:focus:ring-lime-400 mb-2">
+          ${VDOT_PRESET_DISTANCES.map((d) => `<option value="${d.meters}">${d.label}</option>`).join('')}
+          <option value="custom">その他（距離を指定）</option>
+        </select>
+        <div id="vdot-custom-distance-wrap" class="hidden mb-3">
+          <input id="vdot-custom-distance-input" type="number" min="1" max="${MAX_METERS}" step="1" inputmode="numeric"
+            placeholder="距離 (m)" autocomplete="off"
+            class="w-full bg-neutral-100 dark:bg-neutral-800 rounded-xl px-3 py-2 text-sm text-neutral-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-lime-600 dark:focus:ring-lime-400">
+        </div>
+
+        <label class="block text-xs font-semibold text-neutral-500 dark:text-neutral-400 mb-1 mt-1">タイム</label>
+        <div class="flex items-center justify-center gap-0.5 mb-1">
+          <input id="vdot-hh-input" type="number" inputmode="numeric" pattern="[0-9]*" min="0" max="99" placeholder="00" autocomplete="off" aria-label="時"
+            class="vdot-time-input w-11 bg-neutral-200 dark:bg-neutral-800 rounded-xl text-center text-lg font-mono py-2 focus:outline-none focus:ring-2 focus:ring-lime-600 dark:focus:ring-lime-400 text-neutral-900 dark:text-white transition-shadow" data-vdot-unit="hh">
+          <span class="text-neutral-400 dark:text-neutral-500 font-mono text-lg px-0.5">:</span>
+          <input id="vdot-mm-input" type="number" inputmode="numeric" pattern="[0-9]*" min="0" max="59" placeholder="00" autocomplete="off" aria-label="分"
+            class="vdot-time-input w-11 bg-neutral-200 dark:bg-neutral-800 rounded-xl text-center text-lg font-mono py-2 focus:outline-none focus:ring-2 focus:ring-lime-600 dark:focus:ring-lime-400 text-neutral-900 dark:text-white transition-shadow" data-vdot-unit="mm">
+          <span class="text-neutral-400 dark:text-neutral-500 font-mono text-lg px-0.5">:</span>
+          <input id="vdot-ss-input" type="number" inputmode="numeric" pattern="[0-9]*" min="0" max="59" placeholder="00" autocomplete="off" aria-label="秒"
+            class="vdot-time-input w-11 bg-neutral-200 dark:bg-neutral-800 rounded-xl text-center text-lg font-mono py-2 focus:outline-none focus:ring-2 focus:ring-lime-600 dark:focus:ring-lime-400 text-neutral-900 dark:text-white transition-shadow" data-vdot-unit="ss">
+          <span class="text-neutral-400 dark:text-neutral-500 font-mono text-lg px-0.5">.</span>
+          <input id="vdot-cs-input" type="number" inputmode="numeric" pattern="[0-9]*" min="0" max="99" placeholder="00" autocomplete="off" aria-label="ミリ秒"
+            class="vdot-time-input w-11 bg-neutral-200 dark:bg-neutral-800 rounded-xl text-center text-lg font-mono py-2 focus:outline-none focus:ring-2 focus:ring-lime-600 dark:focus:ring-lime-400 text-neutral-900 dark:text-white transition-shadow" data-vdot-unit="cs">
+        </div>
+        <div class="flex justify-center gap-0.5 mb-3 text-[10px] text-neutral-400 dark:text-neutral-600 font-mono">
+          <span class="w-11 text-center">時</span><span class="w-3"></span>
+          <span class="w-11 text-center">分</span><span class="w-3"></span>
+          <span class="w-11 text-center">秒</span><span class="w-3"></span>
+          <span class="w-11 text-center">ms</span>
+        </div>
+
+        <div class="text-center mb-3">
+          <div id="vdot-result-value" class="text-3xl font-black bg-gradient-to-r from-lime-600 to-green-500 dark:from-lime-400 dark:to-green-300 bg-clip-text text-transparent">--</div>
+          <div class="text-[10px] text-neutral-400 dark:text-neutral-600">VDOT</div>
+        </div>
+
+        <div id="vdot-zone-list" class="space-y-1.5"></div>
+      </div>
+    `;
+    document.body.appendChild(vdotModalOverlay);
+
+    vdotDistanceSelect = vdotModalOverlay.querySelector('#vdot-distance-select');
+    vdotCustomWrap = vdotModalOverlay.querySelector('#vdot-custom-distance-wrap');
+    vdotCustomInput = vdotModalOverlay.querySelector('#vdot-custom-distance-input');
+    vdotHhInput = vdotModalOverlay.querySelector('#vdot-hh-input');
+    vdotMmInput = vdotModalOverlay.querySelector('#vdot-mm-input');
+    vdotSsInput = vdotModalOverlay.querySelector('#vdot-ss-input');
+    vdotCsInput = vdotModalOverlay.querySelector('#vdot-cs-input');
+    vdotResultEl = vdotModalOverlay.querySelector('#vdot-result-value');
+
+    const zoneListEl = vdotModalOverlay.querySelector('#vdot-zone-list');
+    TRAINING_ZONES.forEach((z) => {
+      const row = document.createElement('div');
+      row.className = 'rounded-xl bg-neutral-100/70 dark:bg-neutral-800/70 overflow-hidden';
+      row.innerHTML = `
+        <button type="button" class="vdot-zone-toggle w-full flex items-center gap-2 px-3 py-2 text-left" aria-expanded="false">
+          <span class="shrink-0 w-8 h-8 flex items-center justify-center rounded-full bg-gradient-to-br from-lime-600 to-green-500 dark:from-lime-400 dark:to-green-300 text-white dark:text-neutral-950 text-xs font-black">${z.key}</span>
+          <div class="flex-1 min-w-0">
+            <div class="text-xs font-semibold text-neutral-800 dark:text-neutral-200">${z.label}</div>
+            <div class="text-[10px] text-neutral-400 dark:text-neutral-600 truncate">${z.desc}</div>
+          </div>
+          <div class="shrink-0 text-right">
+            <div class="vdot-zone-pace text-sm font-mono font-bold text-neutral-900 dark:text-white" data-zone="${z.key}">--'--"</div>
+            <div class="text-[9px] text-neutral-400 dark:text-neutral-600">/ km</div>
+          </div>
+          <svg class="vdot-zone-chevron shrink-0 w-4 h-4 text-neutral-400 dark:text-neutral-600 transition-transform" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="6 9 12 15 18 9"></polyline>
+          </svg>
+        </button>
+        <div class="vdot-zone-hint hidden px-3 pb-3 text-[11px] leading-relaxed text-neutral-500 dark:text-neutral-400">${z.hint}</div>
+      `;
+      zoneListEl.appendChild(row);
+    });
+
+    zoneListEl.addEventListener('click', (e) => {
+      const btn = e.target.closest('.vdot-zone-toggle');
+      if (!btn) return;
+      const expanded = btn.getAttribute('aria-expanded') === 'true';
+      btn.setAttribute('aria-expanded', String(!expanded));
+      btn.nextElementSibling.classList.toggle('hidden', expanded);
+      btn.querySelector('.vdot-zone-chevron').classList.toggle('rotate-180', !expanded);
+    });
+
+    vdotModalOverlay.querySelector('#vdot-modal-close').addEventListener('click', closeVdotModal);
+    vdotModalOverlay.addEventListener('click', (e) => {
+      if (e.target === vdotModalOverlay) closeVdotModal();
+    });
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && !vdotModalOverlay.classList.contains('hidden')) closeVdotModal();
+    });
+
+    vdotDistanceSelect.addEventListener('change', onVdotDistanceChange);
+    vdotCustomInput.addEventListener('input', recalcVdot);
+    vdotModalOverlay.addEventListener('input', onVdotTimeInput);
+    vdotModalOverlay.addEventListener('keydown', onVdotTimeKeydown);
+    vdotModalOverlay.addEventListener('focusout', onVdotTimeFocusOut);
+    vdotModalOverlay.addEventListener('focusin', onVdotTimeFocusIn);
+  }
+
+  function openVdotModal() {
+    const saved = loadVdotRace();
+    if (saved) {
+      const preset = VDOT_PRESET_DISTANCES.find((d) => d.meters === saved.meters);
+      if (preset) {
+        vdotDistanceSelect.value = String(preset.meters);
+        vdotCustomWrap.classList.add('hidden');
+        vdotCustomInput.value = '';
+      } else {
+        vdotDistanceSelect.value = 'custom';
+        vdotCustomInput.value = String(saved.meters);
+        vdotCustomWrap.classList.remove('hidden');
+      }
+      const { hh, mm, ss, cs } = msToFields(saved.totalMs);
+      setVdotField('hh', hh);
+      setVdotField('mm', mm);
+      setVdotField('ss', ss);
+      setVdotField('cs', cs);
+    } else {
+      vdotDistanceSelect.value = '5000';
+      vdotCustomWrap.classList.add('hidden');
+      vdotCustomInput.value = '';
+      vdotTimeInputs().forEach((el) => { el.value = ''; });
+    }
+
+    recalcVdot();
+    vdotModalOverlay.classList.remove('hidden');
+    vdotModalOverlay.classList.add('flex');
+    document.body.classList.add('modal-open');
+  }
+
+  function closeVdotModal() {
+    vdotModalOverlay.classList.add('hidden');
+    vdotModalOverlay.classList.remove('flex');
+    document.body.classList.remove('modal-open');
+  }
+
   // ---------- 初期化 ----------
 
   function init() {
@@ -859,6 +1247,9 @@
 
     buildModal();
     editDistancesBtn.addEventListener('click', openModal);
+
+    buildVdotModal();
+    vdotBtn.addEventListener('click', openVdotModal);
   }
 
   init();

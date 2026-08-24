@@ -49,7 +49,7 @@
     } catch (e) {}
   })();
 </script>
-<link rel="stylesheet" href="css/style.css?v=6">
+<link rel="stylesheet" href="css/style.css?v=8">
 </head>
 <body class="bg-[#f7faf2] dark:bg-[#0a0e08] text-neutral-900 dark:text-white min-h-screen antialiased transition-colors">
   <div class="max-w-md mx-auto px-4 pt-6 pb-16 animate-fade-in-up">
@@ -99,6 +99,19 @@
       <p class="text-[10px] text-neutral-400 dark:text-neutral-600 mt-1">ここに直接ペースを入力してもOK</p>
     </div>
 
+    <div class="mb-4 flex flex-col items-center gap-1">
+      <button id="vdot-btn" type="button"
+        class="inline-flex items-center gap-1.5 px-4 py-2 rounded-full bg-white/80 dark:bg-neutral-900/80 backdrop-blur-sm border border-lime-600/15 dark:border-lime-400/15 text-neutral-600 dark:text-neutral-300 text-xs font-semibold shadow-sm shadow-lime-900/5 dark:shadow-black/40 hover:-translate-y-0.5 active:translate-y-0 active:scale-95 transition">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-4 h-4">
+          <circle cx="12" cy="12" r="9"></circle>
+          <circle cx="12" cy="12" r="4"></circle>
+          <circle cx="12" cy="12" r="0.5" fill="currentColor"></circle>
+        </svg>
+        トレーニングペースを計算
+      </button>
+      <p class="text-[10px] text-neutral-400 dark:text-neutral-600">お試し機能・使わなくてもOK</p>
+    </div>
+
     <div id="distance-list" class="space-y-3"></div>
 
     <div class="mt-6 flex justify-center">
@@ -114,7 +127,7 @@
     </footer>
   </div>
 
-  <script src="js/app.js?v=6"></script>
+  <script src="js/app.js?v=8"></script>
   <script>
     // 電波の弱い場所でも起動できるよう、アプリ本体をService Workerでキャッシュする
     if ('serviceWorker' in navigator) {

@@ -69,6 +69,30 @@ body.modal-open {
   overflow: hidden;
 }
 
+/* VDOT modal time-input fields share the pace-input numeric-field treatment */
+.vdot-time-input::-webkit-outer-spin-button,
+.vdot-time-input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+.vdot-time-input {
+  -moz-appearance: textfield;
+  appearance: textfield;
+  font-variant-numeric: tabular-nums;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+  caret-color: #65a30d; /* lime-600, light mode */
+}
+html.dark .vdot-time-input {
+  caret-color: #a3e635; /* lime-400, dark mode */
+}
+.vdot-time-input:focus {
+  background-color: #e5e5e5; /* neutral-200, light mode */
+}
+html.dark .vdot-time-input:focus {
+  background-color: #171717; /* neutral-900, dark mode */
+}
+
 /* Distance card drag-to-reorder */
 .drag-handle {
   touch-action: none;

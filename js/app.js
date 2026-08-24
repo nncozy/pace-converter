@@ -288,7 +288,9 @@
         input.pattern = '[0-9]*';
         input.min = '0';
         input.max = String(UNIT_MAX[unit]);
-        input.placeholder = '00';
+        // "00"だと未入力なのか実際に0が入っているのか見分けがつかないため、
+        // 上部のペースサマリー欄と同じく"--"を使う
+        input.placeholder = '--';
         input.autocomplete = 'off';
         input.setAttribute('aria-label', `${meters}m ${UNIT_LABEL[unit]}`);
         input.className =
@@ -1219,16 +1221,16 @@
 
         <label class="block text-xs font-semibold text-neutral-500 dark:text-neutral-400 mb-1 mt-1">タイム</label>
         <div class="flex items-center justify-center gap-0.5 mb-1">
-          <input id="vdot-hh-input" type="number" inputmode="numeric" pattern="[0-9]*" min="0" max="99" placeholder="00" autocomplete="off" aria-label="時"
+          <input id="vdot-hh-input" type="number" inputmode="numeric" pattern="[0-9]*" min="0" max="99" placeholder="--" autocomplete="off" aria-label="時"
             class="vdot-time-input w-11 bg-neutral-200 dark:bg-neutral-800 rounded-xl text-center text-lg font-mono py-2 focus:outline-none focus:ring-2 focus:ring-lime-600 dark:focus:ring-lime-400 text-neutral-900 dark:text-white transition-shadow" data-vdot-unit="hh">
           <span class="text-neutral-400 dark:text-neutral-500 font-mono text-lg px-0.5">:</span>
-          <input id="vdot-mm-input" type="number" inputmode="numeric" pattern="[0-9]*" min="0" max="59" placeholder="00" autocomplete="off" aria-label="分"
+          <input id="vdot-mm-input" type="number" inputmode="numeric" pattern="[0-9]*" min="0" max="59" placeholder="--" autocomplete="off" aria-label="分"
             class="vdot-time-input w-11 bg-neutral-200 dark:bg-neutral-800 rounded-xl text-center text-lg font-mono py-2 focus:outline-none focus:ring-2 focus:ring-lime-600 dark:focus:ring-lime-400 text-neutral-900 dark:text-white transition-shadow" data-vdot-unit="mm">
           <span class="text-neutral-400 dark:text-neutral-500 font-mono text-lg px-0.5">:</span>
-          <input id="vdot-ss-input" type="number" inputmode="numeric" pattern="[0-9]*" min="0" max="59" placeholder="00" autocomplete="off" aria-label="秒"
+          <input id="vdot-ss-input" type="number" inputmode="numeric" pattern="[0-9]*" min="0" max="59" placeholder="--" autocomplete="off" aria-label="秒"
             class="vdot-time-input w-11 bg-neutral-200 dark:bg-neutral-800 rounded-xl text-center text-lg font-mono py-2 focus:outline-none focus:ring-2 focus:ring-lime-600 dark:focus:ring-lime-400 text-neutral-900 dark:text-white transition-shadow" data-vdot-unit="ss">
           <span class="text-neutral-400 dark:text-neutral-500 font-mono text-lg px-0.5">.</span>
-          <input id="vdot-cs-input" type="number" inputmode="numeric" pattern="[0-9]*" min="0" max="99" placeholder="00" autocomplete="off" aria-label="ミリ秒"
+          <input id="vdot-cs-input" type="number" inputmode="numeric" pattern="[0-9]*" min="0" max="99" placeholder="--" autocomplete="off" aria-label="ミリ秒"
             class="vdot-time-input w-11 bg-neutral-200 dark:bg-neutral-800 rounded-xl text-center text-lg font-mono py-2 focus:outline-none focus:ring-2 focus:ring-lime-600 dark:focus:ring-lime-400 text-neutral-900 dark:text-white transition-shadow" data-vdot-unit="cs">
         </div>
         <div class="flex justify-center gap-0.5 mb-3 text-[10px] text-neutral-400 dark:text-neutral-600 font-mono">

@@ -3,17 +3,78 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<meta name="theme-color" content="#0a0a0a">
+<meta name="theme-color" content="#0a0a0a" id="theme-color-meta">
 <meta name="description" content="距離のタイムを入力すると、同じペースで走った場合の他の距離のタイムを瞬時に自動計算するランナー向けツール。">
 <title>ペース相互換算計算機 | Pace Converter</title>
+
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="icon" href="favicon.ico" sizes="any">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Pace Converter">
+<meta name="mobile-web-app-capable" content="yes">
+
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Pace Converter">
+<meta property="og:locale" content="ja_JP">
+<meta property="og:title" content="ペース相互換算計算機 | Pace Converter">
+<meta property="og:description" content="距離のタイムを入力すると、同じペースで走った場合の他の距離のタイムを瞬時に自動計算するランナー向けツール。">
+<meta property="og:url" content="https://nncozy.github.io/pace-converter/">
+<meta property="og:image" content="https://nncozy.github.io/pace-converter/icons/og-image.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="ペース相互換算計算機 | Pace Converter">
+<meta name="twitter:description" content="距離のタイムを入力すると、同じペースで走った場合の他の距離のタイムを瞬時に自動計算するランナー向けツール。">
+<meta name="twitter:image" content="https://nncozy.github.io/pace-converter/icons/og-image.png">
+
 <script src="https://cdn.tailwindcss.com"></script>
+<script>
+  tailwind.config = { darkMode: 'class' };
+</script>
+<script>
+  // テーマ確定を描画前に行い、切り替え時のちらつきを防ぐ
+  (function () {
+    try {
+      var stored = localStorage.getItem('paceConverter.theme');
+      var isDark = stored === 'dark' ||
+        (stored !== 'light' && window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches);
+      if (isDark) {
+        document.documentElement.classList.add('dark');
+      } else {
+        document.getElementById('theme-color-meta').setAttribute('content', '#ffffff');
+      }
+    } catch (e) {}
+  })();
+</script>
 <link rel="stylesheet" href="css/style.css">
 </head>
-<body class="bg-neutral-950 text-white min-h-screen antialiased">
+<body class="bg-white dark:bg-neutral-950 text-neutral-900 dark:text-white min-h-screen antialiased transition-colors">
   <div class="max-w-md mx-auto px-4 pt-6 pb-16">
-    <header class="mb-6 text-center">
-      <h1 class="text-2xl font-extrabold tracking-tight text-lime-400">PACE CONVERTER</h1>
-      <p class="text-xs text-neutral-400 mt-1">
+    <header class="mb-6">
+      <div class="flex items-center justify-between gap-2 mb-3">
+        <button id="edit-distances-btn" type="button" aria-label="距離を編集"
+          class="w-9 h-9 shrink-0 flex items-center justify-center rounded-full border border-neutral-300 dark:border-neutral-700 text-neutral-600 dark:text-neutral-300 active:scale-95 transition">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-4.5 h-4.5">
+            <line x1="4" y1="6" x2="20" y2="6"></line>
+            <line x1="4" y1="12" x2="20" y2="12"></line>
+            <line x1="4" y1="18" x2="20" y2="18"></line>
+            <circle cx="9" cy="6" r="2" fill="currentColor" stroke="none"></circle>
+            <circle cx="16" cy="12" r="2" fill="currentColor" stroke="none"></circle>
+            <circle cx="10" cy="18" r="2" fill="currentColor" stroke="none"></circle>
+          </svg>
+        </button>
+
+        <h1 class="text-xl sm:text-2xl font-extrabold tracking-tight text-lime-600 dark:text-lime-400 text-center flex-1 truncate">
+          PACE CONVERTER
+        </h1>
+
+        <button id="theme-toggle-btn" type="button" aria-label="テーマを切り替え"
+          class="w-9 h-9 shrink-0 flex items-center justify-center rounded-full border border-neutral-300 dark:border-neutral-700 text-neutral-600 dark:text-neutral-300 active:scale-95 transition"></button>
+      </div>
+      <p class="text-xs text-center text-neutral-500 dark:text-neutral-400">
         どこかの距離のタイムを入力すると、同じペースの他の距離のタイムが自動計算されます
       </p>
     </header>
@@ -22,12 +83,12 @@
 
     <div class="mt-6 flex justify-center">
       <button id="reset-btn" type="button"
-        class="px-5 py-2.5 rounded-full border border-neutral-700 text-neutral-300 text-sm font-medium active:bg-neutral-800 active:scale-95 transition">
+        class="px-5 py-2.5 rounded-full border border-neutral-300 dark:border-neutral-700 text-neutral-600 dark:text-neutral-300 text-sm font-medium active:bg-neutral-100 dark:active:bg-neutral-800 active:scale-95 transition">
         すべてリセット
       </button>
     </div>
 
-    <footer class="mt-8 text-center text-[11px] leading-relaxed text-neutral-600">
+    <footer class="mt-8 text-center text-[11px] leading-relaxed text-neutral-400 dark:text-neutral-600">
       <p>hh : mm : ss . ミリ秒（2桁）の形式で入力してください。</p>
       <p>2桁入力すると自動的に次の欄へ移動します。</p>
     </footer>

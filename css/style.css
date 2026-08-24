@@ -18,11 +18,17 @@ body {
   -moz-appearance: textfield;
   appearance: textfield;
   font-variant-numeric: tabular-nums;
-  caret-color: #a3e635; /* lime-400 */
+  caret-color: #65a30d; /* lime-600, light mode */
+}
+html.dark .pace-input {
+  caret-color: #a3e635; /* lime-400, dark mode */
 }
 
 .pace-input:focus {
-  background-color: #171717; /* neutral-900 */
+  background-color: #e5e5e5; /* neutral-200, light mode */
+}
+html.dark .pace-input:focus {
+  background-color: #171717; /* neutral-900, dark mode */
 }
 
 /* Larger tap targets and no accidental text selection highlight on rapid taps */
@@ -36,5 +42,13 @@ body {
   transition: border-color 120ms ease, background-color 120ms ease;
 }
 .distance-card:focus-within {
-  border-color: #a3e635; /* lime-400 */
+  border-color: #65a30d; /* lime-600, light mode */
+}
+html.dark .distance-card:focus-within {
+  border-color: #a3e635; /* lime-400, dark mode */
+}
+
+/* Prevent background scroll while the distance-edit modal is open */
+body.modal-open {
+  overflow: hidden;
 }

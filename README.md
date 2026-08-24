@@ -80,3 +80,10 @@ python3 -m http.server 8000
 2. リポジトリの Settings → Pages を開く
 3. Source を「Deploy from a branch」、Branch を `main` / `/(root)` に設定して保存
 4. しばらく待つと `https://<ユーザー名>.github.io/<リポジトリ名>/` で公開される
+
+### キャッシュについて
+
+`css/style.css` と `js/app.js` は `index.html` から `?v=N` 付きで読み込んでいます。
+これらのファイルを更新してデプロイする際は、`index.html` 内の2箇所の `?v=N` を
+インクリメントしてください。バージョンを変えないと、訪問者のブラウザ（や途中の
+キャッシュ・プロキシ）が古いファイルを使い続け、変更が反映されないことがあります。

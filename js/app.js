@@ -29,7 +29,8 @@
   const resetBtn = document.getElementById('reset-btn');
   const themeToggleBtn = document.getElementById('theme-toggle-btn');
   const editDistancesBtn = document.getElementById('edit-distances-btn');
-  const paceSummaryValue = document.getElementById('pace-summary-value');
+  const paceMinInput = document.getElementById('pace-min-input');
+  const paceSecInput = document.getElementById('pace-sec-input');
 
   // 現在の基準ペース（ms/m）。未入力なら null。
   let currentPace = null;
@@ -138,17 +139,65 @@
     return String(Math.max(0, n)).padStart(2, '0');
   }
 
-  // 現在の基準ペース(ms/m)を「4'00"」のようなkmあたりの表示に整形する
-  function updatePaceSummary() {
+  // 現在の基準ペース(ms/m)を上部の分・秒入力欄に反映する。
+  // ペース欄自身が入力元のときは呼ばない(自分の入力中に上書きしないため)。
+  function updatePaceSummaryFields() {
     if (currentPace === null) {
-      paceSummaryValue.textContent = `--'--"`;
+      paceMinInput.value = '';
+      paceSecInput.value = '';
       return;
     }
     // ms/m と s/km は数値として同じ(×1000してから÷1000するだけなので)
     const totalSec = Math.round(currentPace);
-    const min = Math.floor(totalSec / 60);
-    const sec = totalSec % 60;
-    paceSummaryValue.textContent = `${min}'${pad2(sec)}"`;
+    paceMinInput.value = String(Math.floor(totalSec / 60));
+    paceSecInput.value = pad2(totalSec % 60);
+  }
+
+  // 上部のペース入力欄(分・秒)から currentPace を再計算し、全距離に反映する
+  function recalcFromPaceSummary() {
+    const min = parseInt(paceMinInput.value, 10) || 0;
+    const sec = parseInt(paceSecInput.value, 10) || 0;
+    currentPace = min * 60 + sec; // s/km == ms/m
+    applyPaceToAllVisible();
+  }
+
+  function onPaceSummaryInput(e) {
+    const input = e.target;
+    const maxLen = input === paceMinInput ? 3 : 2;
+    let digits = input.value.replace(/[^0-9]/g, '');
+    if (digits.length > maxLen) digits = digits.slice(0, maxLen);
+    if (digits !== input.value) input.value = digits;
+
+    recalcFromPaceSummary();
+
+    if (input === paceMinInput && digits.length === 2) {
+      paceSecInput.focus();
+      paceSecInput.select();
+    }
+  }
+
+  function onPaceSummaryKeydown(e) {
+    if (e.key !== 'Backspace') return;
+    if (e.target !== paceSecInput || e.target.value !== '') return;
+    e.preventDefault();
+    paceMinInput.focus();
+    paceMinInput.select();
+  }
+
+  function onPaceSummaryFocusOut(e) {
+    const input = e.target;
+    if (input === paceSecInput) {
+      const v = clampUnitValue('mm', parseInt(input.value, 10));
+      input.value = pad2(v);
+    } else {
+      const v = parseInt(input.value, 10);
+      input.value = Number.isNaN(v) ? '00' : String(Math.min(Math.max(v, 0), 999));
+    }
+    recalcFromPaceSummary();
+  }
+
+  function onPaceSummaryFocusIn(e) {
+    e.target.select();
   }
 
   function renderCards() {
@@ -296,7 +345,7 @@
     const totalMs = distanceToMs(sourceDistance);
     const pace = totalMs / sourceDistance; // ms / m
     currentPace = pace;
-    updatePaceSummary();
+    updatePaceSummaryFields();
 
     visibleDistances().forEach(({ meters }) => {
       if (meters === sourceDistance) return;
@@ -393,21 +442,34 @@
         getInput(meters, unit).value = '';
       });
     });
+    updatePaceSummaryFields();
     // フォーカスを残したままだとモバイルで数字キーボードが開いたままになるため外す
-    if (document.activeElement && document.activeElement.classList.contains('pace-input')) {
-      document.activeElement.blur();
+    const active = document.activeElement;
+    if (active && (active.classList.contains('pace-input') || active.classList.contains('pace-summary-input'))) {
+      active.blur();
     }
-    updatePaceSummary();
   }
 
   // ---------- カードの並び替え(ドラッグ&ドロップ) ----------
+  //
+  // position:fixed の left/top は動かさず固定し、指の移動量ぶんだけ
+  // transform: translate3d() で追従させる(レイアウト計算を伴わずコンポジタ
+  // だけで動くのでヌルヌル動く)。他のカードがどくアニメーションと、指を
+  // 離した瞬間の着地アニメーションはFLIP(First-Last-Invert-Play)で行う。
 
   let dragCard = null;
   let dragPlaceholder = null;
   let dragPointerId = null;
-  let dragOffsetX = 0;
-  let dragOffsetY = 0;
+  let dragStartClientX = 0;
+  let dragStartClientY = 0;
+  let dragStartTop = 0;
   let dragCardHeight = 0;
+  let dragRafId = null;
+  let dragPendingX = 0;
+  let dragPendingY = 0;
+  let dragTrackingStarted = false;
+
+  const DRAG_SETTLE_MS = 180;
 
   function onDragPointerDown(e) {
     if (dragCard) return; // 既にドラッグ中なら多重開始しない
@@ -423,9 +485,11 @@
     const rect = card.getBoundingClientRect();
     dragCard = card;
     dragPointerId = e.pointerId;
-    dragOffsetX = e.clientX - rect.left;
-    dragOffsetY = e.clientY - rect.top;
+    dragStartClientX = e.clientX;
+    dragStartClientY = e.clientY;
+    dragStartTop = rect.top;
     dragCardHeight = rect.height;
+    dragTrackingStarted = false;
 
     dragPlaceholder = document.createElement('div');
     dragPlaceholder.className =
@@ -439,6 +503,9 @@
     card.style.width = `${rect.width}px`;
     card.style.zIndex = '1000';
     card.style.pointerEvents = 'none';
+    // 持ち上げの瞬間だけふわっと拡大させ、以降の追従はtransitionなし(遅延ゼロ)にする
+    card.style.transition = 'transform 120ms ease, box-shadow 150ms ease';
+    card.style.transform = 'scale(1.03)';
     card.classList.add('dragging-card');
     document.body.classList.add('dragging');
     document.body.appendChild(card);
@@ -455,13 +522,28 @@
   function onDragPointerMove(e) {
     if (!dragCard || e.pointerId !== dragPointerId) return;
     e.preventDefault();
+    dragPendingX = e.clientX;
+    dragPendingY = e.clientY;
+    if (dragRafId === null) {
+      dragRafId = requestAnimationFrame(processDragFrame);
+    }
+  }
 
-    const x = e.clientX - dragOffsetX;
-    const y = e.clientY - dragOffsetY;
-    dragCard.style.left = `${x}px`;
-    dragCard.style.top = `${y}px`;
+  function processDragFrame() {
+    dragRafId = null;
+    if (!dragCard) return;
 
-    const dragCenterY = y + dragCardHeight / 2;
+    if (!dragTrackingStarted) {
+      // 持ち上げアニメーションを一度見せたら、以降は追従優先でtransitionを切る
+      dragCard.style.transition = 'none';
+      dragTrackingStarted = true;
+    }
+
+    const dx = dragPendingX - dragStartClientX;
+    const dy = dragPendingY - dragStartClientY;
+    dragCard.style.transform = `translate3d(${dx}px, ${dy}px, 0) scale(1.03)`;
+
+    const dragCenterY = dragStartTop + dy + dragCardHeight / 2;
     const siblings = Array.from(listEl.children).filter(
       (el) => el !== dragPlaceholder && el !== dragCard && el.classList.contains('distance-card')
     );
@@ -474,32 +556,97 @@
         break;
       }
     }
-    if (target) {
-      if (dragPlaceholder.nextSibling !== target) listEl.insertBefore(dragPlaceholder, target);
-    } else if (listEl.lastElementChild !== dragPlaceholder) {
-      listEl.appendChild(dragPlaceholder);
+
+    const needsMove = target
+      ? dragPlaceholder.nextSibling !== target
+      : listEl.lastElementChild !== dragPlaceholder;
+    if (needsMove) {
+      animateSiblingsReorder(() => {
+        if (target) listEl.insertBefore(dragPlaceholder, target);
+        else listEl.appendChild(dragPlaceholder);
+      });
     }
+  }
+
+  // mutate前後のカード位置の差分だけ逆方向にtransformしておき、0へtransitionさせる(FLIP)
+  function animateSiblingsReorder(mutate) {
+    const cards = Array.from(listEl.querySelectorAll('.distance-card'));
+    const firstTops = new Map();
+    cards.forEach((el) => firstTops.set(el, el.getBoundingClientRect().top));
+
+    mutate();
+
+    cards.forEach((el) => {
+      const firstTop = firstTops.get(el);
+      const lastTop = el.getBoundingClientRect().top;
+      const delta = firstTop - lastTop;
+      if (!delta) return;
+      el.style.transition = 'none';
+      el.style.transform = `translateY(${delta}px)`;
+      requestAnimationFrame(() => {
+        el.style.transition = `transform ${DRAG_SETTLE_MS}ms ease`;
+        el.style.transform = '';
+        el.addEventListener(
+          'transitionend',
+          () => {
+            el.style.transition = '';
+          },
+          { once: true }
+        );
+      });
+    });
   }
 
   function onDragPointerEnd(e) {
     if (!dragCard || e.pointerId !== dragPointerId) return;
-    const handle = dragCard.querySelector('.drag-handle');
+    if (dragRafId !== null) {
+      cancelAnimationFrame(dragRafId);
+      dragRafId = null;
+    }
+
+    const card = dragCard; // 非同期コールバック内でも安全に参照できるようローカルへ退避
+    const handle = card.querySelector('.drag-handle');
     if (handle) {
       handle.removeEventListener('pointermove', onDragPointerMove);
       handle.removeEventListener('pointerup', onDragPointerEnd);
       handle.removeEventListener('pointercancel', onDragPointerEnd);
     }
 
-    dragPlaceholder.parentNode.insertBefore(dragCard, dragPlaceholder);
+    const beforeRect = card.getBoundingClientRect(); // ドラッグ中の見た目上の位置
+
+    dragPlaceholder.parentNode.insertBefore(card, dragPlaceholder);
     dragPlaceholder.remove();
-    dragCard.style.position = '';
-    dragCard.style.left = '';
-    dragCard.style.top = '';
-    dragCard.style.width = '';
-    dragCard.style.zIndex = '';
-    dragCard.style.pointerEvents = '';
-    dragCard.classList.remove('dragging-card');
+    card.style.position = '';
+    card.style.left = '';
+    card.style.top = '';
+    card.style.width = '';
+    card.style.zIndex = '';
+    card.style.pointerEvents = '';
+    card.classList.remove('dragging-card');
     document.body.classList.remove('dragging');
+
+    // 通常フローに戻した後の本来の位置との差分ぶんアニメーションさせて着地させる(FLIP)
+    const afterRect = card.getBoundingClientRect();
+    const dx = beforeRect.left - afterRect.left;
+    const dy = beforeRect.top - afterRect.top;
+    if (dx || dy) {
+      card.style.transition = 'none';
+      card.style.transform = `translate3d(${dx}px, ${dy}px, 0) scale(1.03)`;
+      requestAnimationFrame(() => {
+        card.style.transition = `transform ${DRAG_SETTLE_MS}ms ease`;
+        card.style.transform = '';
+        card.addEventListener(
+          'transitionend',
+          () => {
+            card.style.transition = '';
+          },
+          { once: true }
+        );
+      });
+    } else {
+      card.style.transition = '';
+      card.style.transform = '';
+    }
 
     const newOrder = Array.from(listEl.querySelectorAll('.distance-card')).map((c) =>
       Number(c.dataset.distance)
@@ -684,13 +831,29 @@
 
   function init() {
     renderCards();
-    updatePaceSummary();
+    updatePaceSummaryFields();
     listEl.addEventListener('input', onInput);
     listEl.addEventListener('keydown', onKeydown);
     listEl.addEventListener('focusin', onFocusIn);
     listEl.addEventListener('focusout', onFocusOut);
     listEl.addEventListener('pointerdown', onDragPointerDown);
+    // アプリ切り替えなどでページが非表示になった場合、rAFが止まりドラッグが
+    // 宙に浮いたままになるのを防ぐため、ドラッグ中なら強制的に確定させる
+    document.addEventListener('visibilitychange', () => {
+      if (document.hidden && dragCard && dragPointerId !== null) {
+        onDragPointerEnd({ pointerId: dragPointerId });
+      }
+    });
     resetBtn.addEventListener('click', resetAll);
+
+    paceMinInput.addEventListener('input', onPaceSummaryInput);
+    paceSecInput.addEventListener('input', onPaceSummaryInput);
+    paceMinInput.addEventListener('keydown', onPaceSummaryKeydown);
+    paceSecInput.addEventListener('keydown', onPaceSummaryKeydown);
+    paceMinInput.addEventListener('focusout', onPaceSummaryFocusOut);
+    paceSecInput.addEventListener('focusout', onPaceSummaryFocusOut);
+    paceMinInput.addEventListener('focusin', onPaceSummaryFocusIn);
+    paceSecInput.addEventListener('focusin', onPaceSummaryFocusIn);
 
     initTheme();
 

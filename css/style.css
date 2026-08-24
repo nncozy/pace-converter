@@ -37,6 +37,20 @@ html.dark .pace-input:focus {
   touch-action: manipulation;
 }
 
+/* Pace summary (min/sec) inputs share the same numeric-field treatment */
+.pace-summary-input::-webkit-outer-spin-button,
+.pace-summary-input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+.pace-summary-input {
+  -moz-appearance: textfield;
+  appearance: textfield;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+  caret-color: currentColor;
+}
+
 /* Distance card subtle press feedback */
 .distance-card {
   transition: border-color 120ms ease, background-color 120ms ease, box-shadow 120ms ease;
@@ -69,7 +83,7 @@ body.dragging {
 }
 .dragging-card {
   box-shadow: 0 20px 40px -8px rgba(0, 0, 0, 0.35);
-  transform: scale(1.02);
+  will-change: transform;
 }
 
 /* Gentle entrance for the main content on first paint */

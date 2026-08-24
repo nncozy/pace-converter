@@ -142,8 +142,14 @@
     if (meters > MAX_METERS) {
       return { ok: false, error: `${MAX_METERS.toLocaleString('ja-JP')}m以下で入力してください` };
     }
-    if (distances.some((d) => d.meters === meters)) {
-      return { ok: false, error: 'その距離はすでに追加されています' };
+    const existing = distances.find((d) => d.meters === meters);
+    if (existing) {
+      return {
+        ok: false,
+        error: existing.visible
+          ? 'その距離はすでに追加されています'
+          : 'その距離はすでに追加されています（上の一覧でチェックを入れると表示されます）',
+      };
     }
     const maxOrder = distances.reduce((m, d) => Math.max(m, d.order), -1);
     distances.push({ meters, custom: true, visible: true, order: maxOrder + 1 });

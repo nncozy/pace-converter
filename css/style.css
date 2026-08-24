@@ -39,16 +39,33 @@ html.dark .pace-input:focus {
 
 /* Distance card subtle press feedback */
 .distance-card {
-  transition: border-color 120ms ease, background-color 120ms ease;
+  transition: border-color 120ms ease, background-color 120ms ease, box-shadow 120ms ease;
 }
 .distance-card:focus-within {
   border-color: #65a30d; /* lime-600, light mode */
+  box-shadow: 0 0 0 3px rgba(101, 163, 13, 0.15);
 }
 html.dark .distance-card:focus-within {
   border-color: #a3e635; /* lime-400, dark mode */
+  box-shadow: 0 0 0 3px rgba(163, 230, 53, 0.15);
 }
 
 /* Prevent background scroll while the distance-edit modal is open */
 body.modal-open {
   overflow: hidden;
+}
+
+/* Gentle entrance for the main content on first paint */
+@keyframes fade-in-up {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.animate-fade-in-up {
+  animation: fade-in-up 0.45s ease-out both;
 }

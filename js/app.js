@@ -131,13 +131,13 @@
       const alt = altLabel(meters);
       const card = document.createElement('div');
       card.className =
-        'distance-card bg-neutral-100 dark:bg-neutral-900 rounded-2xl p-3 border border-neutral-200 dark:border-neutral-800';
+        'distance-card bg-white/90 dark:bg-neutral-900/90 backdrop-blur-sm rounded-2xl p-3.5 border border-lime-600/10 dark:border-lime-400/10 shadow-lg shadow-lime-900/5 dark:shadow-black/30';
       card.dataset.distance = String(meters);
 
       const header = document.createElement('div');
       header.className = 'flex items-baseline justify-center gap-1.5 mb-2';
       header.innerHTML = `
-        <span class="font-bold text-lime-600 dark:text-lime-400 text-lg">${meters.toLocaleString('ja-JP')}</span>
+        <span class="font-extrabold text-lime-600 dark:text-lime-400 text-lg">${meters.toLocaleString('ja-JP')}</span>
         <span class="text-xs text-neutral-500 dark:text-neutral-500 font-normal">m</span>
         ${alt ? `<span class="text-[10px] text-neutral-400 dark:text-neutral-600 font-normal ml-1">(${alt})</span>` : ''}
       `;
@@ -164,8 +164,8 @@
         input.autocomplete = 'off';
         input.setAttribute('aria-label', `${meters}m ${UNIT_LABEL[unit]}`);
         input.className =
-          'pace-input w-12 bg-neutral-200 dark:bg-neutral-800 rounded-lg text-center text-xl font-mono py-2.5 ' +
-          'focus:outline-none focus:ring-2 focus:ring-lime-600 dark:focus:ring-lime-400 text-neutral-900 dark:text-white';
+          'pace-input w-12 bg-neutral-200 dark:bg-neutral-800 rounded-xl text-center text-xl font-mono py-2.5 ' +
+          'focus:outline-none focus:ring-2 focus:ring-lime-600 dark:focus:ring-lime-400 text-neutral-900 dark:text-white transition-shadow';
         input.dataset.distance = String(meters);
         input.dataset.unit = unit;
 
@@ -352,7 +352,7 @@
 
   // ---------- テーマ切り替え ----------
 
-  const THEME_COLOR = { dark: '#0a0a0a', light: '#ffffff' };
+  const THEME_COLOR = { dark: '#0a0e08', light: '#f7faf2' };
 
   function currentTheme() {
     return document.documentElement.classList.contains('dark') ? 'dark' : 'light';
@@ -390,12 +390,12 @@
     modalOverlay.className =
       'fixed inset-0 z-50 hidden items-end sm:items-center justify-center bg-black/60 px-0 sm:px-4';
     modalOverlay.innerHTML = `
-      <div id="distance-modal-panel" class="w-full sm:max-w-sm sm:rounded-2xl rounded-t-2xl bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 p-4 max-h-[80vh] flex flex-col">
+      <div id="distance-modal-panel" class="w-full sm:max-w-sm sm:rounded-3xl rounded-t-3xl bg-white/95 dark:bg-neutral-900/95 backdrop-blur-sm border border-lime-600/10 dark:border-lime-400/10 shadow-2xl shadow-lime-900/10 dark:shadow-black/50 p-4 max-h-[80vh] flex flex-col">
         <div class="flex items-center justify-between mb-3">
           <h2 class="text-base font-bold text-neutral-900 dark:text-white">距離を編集</h2>
           <button id="distance-modal-close" type="button" aria-label="閉じる"
             class="w-8 h-8 flex items-center justify-center rounded-full text-neutral-500 dark:text-neutral-400 active:bg-neutral-100 dark:active:bg-neutral-800">
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-5 h-5">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-5 h-5">
               <line x1="18" y1="6" x2="6" y2="18"></line>
               <line x1="6" y1="6" x2="18" y2="18"></line>
             </svg>
@@ -403,13 +403,13 @@
         </div>
         <p class="text-xs text-neutral-500 dark:text-neutral-400 mb-2">チェックを外すと一覧から非表示になります。</p>
         <div id="distance-modal-list" class="flex-1 overflow-y-auto space-y-0.5 -mx-1 px-1"></div>
-        <div class="mt-3 pt-3 border-t border-neutral-200 dark:border-neutral-800">
+        <div class="mt-3 pt-3 border-t border-lime-600/10 dark:border-lime-400/10">
           <div class="flex gap-2">
             <input id="new-distance-input" type="number" min="1" max="${MAX_METERS}" step="1" inputmode="numeric"
               placeholder="距離を追加 (m)"
-              class="flex-1 min-w-0 bg-neutral-100 dark:bg-neutral-800 rounded-lg px-3 py-2 text-sm text-neutral-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-lime-600 dark:focus:ring-lime-400">
+              class="flex-1 min-w-0 bg-neutral-100 dark:bg-neutral-800 rounded-xl px-3 py-2 text-sm text-neutral-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-lime-600 dark:focus:ring-lime-400">
             <button id="add-distance-btn" type="button"
-              class="px-4 py-2 rounded-lg bg-lime-600 dark:bg-lime-400 text-white dark:text-neutral-950 text-sm font-bold active:scale-95 transition shrink-0">
+              class="px-4 py-2 rounded-xl bg-gradient-to-r from-lime-600 to-green-500 dark:from-lime-400 dark:to-green-300 text-white dark:text-neutral-950 text-sm font-bold shadow-md shadow-lime-600/30 dark:shadow-lime-400/20 hover:-translate-y-0.5 active:translate-y-0 active:scale-95 transition shrink-0">
               追加
             </button>
           </div>

@@ -131,6 +131,32 @@
     saveDistances();
   }
 
+  // ドラッグできない環境(キーボード操作)向けに、表示中の距離を1つ前後に移動する。
+  // directionは-1(前へ)か+1(後ろへ)。
+  function moveVisibleDistance(meters, direction) {
+    const visible = visibleDistances();
+    const idx = visible.findIndex((d) => d.meters === meters);
+    const targetIdx = idx + direction;
+    if (idx === -1 || targetIdx < 0 || targetIdx >= visible.length) return;
+
+    const newOrder = visible.map((d) => d.meters);
+    [newOrder[idx], newOrder[targetIdx]] = [newOrder[targetIdx], newOrder[idx]];
+    persistVisibleOrder(newOrder);
+    renderCards();
+    applyPaceToAllVisible();
+
+    const handle = listEl.querySelector(`.drag-handle[data-distance="${meters}"]`);
+    if (handle) handle.focus();
+  }
+
+  function onDragHandleKeydown(e) {
+    if (e.key !== 'ArrowUp' && e.key !== 'ArrowDown') return;
+    const handle = e.target.closest('.drag-handle');
+    if (!handle) return;
+    e.preventDefault();
+    moveVisibleDistance(Number(handle.dataset.distance), e.key === 'ArrowUp' ? -1 : 1);
+  }
+
   function altLabel(meters) {
     return meters >= 1000 && meters % 1000 === 0 ? `${meters / 1000}km` : null;
   }
@@ -261,7 +287,7 @@
       const header = document.createElement('div');
       header.className = 'flex items-center gap-2 mb-2';
       header.innerHTML = `
-        <button type="button" class="drag-handle shrink-0 w-7 h-7 flex items-center justify-center rounded-full text-neutral-400 dark:text-neutral-600 touch-none cursor-grab active:cursor-grabbing" aria-label="${meters}mを並び替え" data-distance="${meters}">
+        <button type="button" class="drag-handle shrink-0 w-7 h-7 flex items-center justify-center rounded-full text-neutral-400 dark:text-neutral-600 touch-none cursor-grab active:cursor-grabbing" aria-label="${meters}mを並び替え（矢印キーの上下でも移動できます）" data-distance="${meters}">
           <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
             <circle cx="9" cy="6" r="1.6"></circle><circle cx="15" cy="6" r="1.6"></circle>
             <circle cx="9" cy="12" r="1.6"></circle><circle cx="15" cy="12" r="1.6"></circle>
@@ -1454,6 +1480,7 @@
     listEl.addEventListener('focusin', onFocusIn);
     listEl.addEventListener('focusout', onFocusOut);
     listEl.addEventListener('pointerdown', onDragPointerDown);
+    listEl.addEventListener('keydown', onDragHandleKeydown);
     // アプリ切り替えなどでページが非表示になった場合、rAFが止まりドラッグが
     // 宙に浮いたままになるのを防ぐため、ドラッグ中なら強制的に確定させる
     document.addEventListener('visibilitychange', () => {

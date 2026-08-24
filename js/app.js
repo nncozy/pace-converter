@@ -157,7 +157,11 @@
     moveVisibleDistance(Number(handle.dataset.distance), e.key === 'ArrowUp' ? -1 : 1);
   }
 
+  // キリの良い1000mの倍数ではない有名な距離にも、VDOT機能側と同じ名称を表示する
+  const KNOWN_DISTANCE_LABELS = { 1609: '1マイル', 21097: 'ハーフマラソン', 42195: 'フルマラソン' };
+
   function altLabel(meters) {
+    if (KNOWN_DISTANCE_LABELS[meters]) return KNOWN_DISTANCE_LABELS[meters];
     return meters >= 1000 && meters % 1000 === 0 ? `${meters / 1000}km` : null;
   }
 

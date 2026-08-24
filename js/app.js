@@ -1014,7 +1014,6 @@
     vdotLevelLabelEl,
     vdotLevelDescEl,
     vdotLevelFillEl,
-    vdotLevelMarkerEl,
     vdotPredictToggle,
     vdotPredictPanel,
     vdotPredictListEl;
@@ -1046,7 +1045,6 @@
       vdotLevelLabelEl.textContent = '--';
       vdotLevelDescEl.textContent = '距離とタイムを入力すると目安が表示されます';
       vdotLevelFillEl.style.width = '0%';
-      vdotLevelMarkerEl.style.left = '0%';
       return;
     }
     const level = getVdotLevel(vdot);
@@ -1054,7 +1052,6 @@
     vdotLevelDescEl.textContent = level.desc;
     const pct = Math.max(0, Math.min(100, ((vdot - VDOT_GAUGE_MIN) / (VDOT_GAUGE_MAX - VDOT_GAUGE_MIN)) * 100));
     vdotLevelFillEl.style.width = `${pct}%`;
-    vdotLevelMarkerEl.style.left = `${pct}%`;
   }
 
   function updateVdotPredictions(vdot) {
@@ -1221,9 +1218,8 @@
         <div class="mb-3">
           <div id="vdot-level-label" class="text-center text-xs font-bold text-lime-700 dark:text-lime-300 mb-0.5">--</div>
           <div id="vdot-level-desc" class="text-center text-[10px] text-neutral-400 dark:text-neutral-600 mb-1.5 leading-relaxed">距離とタイムを入力すると目安が表示されます</div>
-          <div class="relative h-2 rounded-full bg-neutral-200 dark:bg-neutral-800">
+          <div class="h-2 rounded-full bg-neutral-200 dark:bg-neutral-800">
             <div id="vdot-level-fill" class="h-2 rounded-full bg-gradient-to-r from-lime-600 to-green-500 dark:from-lime-400 dark:to-green-300 transition-all" style="width: 0%"></div>
-            <div id="vdot-level-marker" class="absolute top-1/2 w-3 h-3 rounded-full bg-white dark:bg-neutral-900 border-2 border-lime-600 dark:border-lime-400 shadow transition-all" style="left: 0%; transform: translate(-50%, -50%);"></div>
           </div>
           <div class="flex justify-between text-[9px] text-neutral-400 dark:text-neutral-600 mt-1">
             <span>初心者</span>
@@ -1267,7 +1263,6 @@
     vdotLevelLabelEl = vdotModalOverlay.querySelector('#vdot-level-label');
     vdotLevelDescEl = vdotModalOverlay.querySelector('#vdot-level-desc');
     vdotLevelFillEl = vdotModalOverlay.querySelector('#vdot-level-fill');
-    vdotLevelMarkerEl = vdotModalOverlay.querySelector('#vdot-level-marker');
     vdotPredictToggle = vdotModalOverlay.querySelector('#vdot-predict-toggle');
     vdotPredictPanel = vdotModalOverlay.querySelector('#vdot-predict-panel');
     vdotPredictListEl = vdotModalOverlay.querySelector('#vdot-predict-list');

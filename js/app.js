@@ -1016,7 +1016,9 @@
     vdotLevelFillEl,
     vdotPredictToggle,
     vdotPredictPanel,
-    vdotPredictListEl;
+    vdotPredictListEl,
+    vdotPredictHelpToggle,
+    vdotPredictHelpText;
 
   function vdotTimeInputs() {
     return [vdotHhInput, vdotMmInput, vdotSsInput, vdotCsInput];
@@ -1236,14 +1238,27 @@
               <circle cx="12" cy="12" r="9"></circle>
               <polyline points="12 7 12 12 15 15"></polyline>
             </svg>
-            <span class="flex-1 text-xs font-semibold text-neutral-800 dark:text-neutral-200">他の距離の予想タイムを見る</span>
+            <span class="flex-1 text-xs font-semibold text-neutral-800 dark:text-neutral-200">他の距離のポテンシャルタイムを見る</span>
             <svg class="vdot-predict-chevron shrink-0 w-4 h-4 text-neutral-400 dark:text-neutral-600 transition-transform" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
               <polyline points="6 9 12 15 18 9"></polyline>
             </svg>
           </button>
           <div id="vdot-predict-panel" class="hidden px-3 pb-3">
+            <p class="text-[10px] text-neutral-500 dark:text-neutral-400 leading-relaxed mb-2">※これは持久力トレーニングを積んだ場合に発揮できる「ポテンシャル」の目安です。今すぐ出せるタイムを保証するものではありません。</p>
             <div id="vdot-predict-list" class="space-y-1"></div>
-            <p class="text-[9px] text-neutral-400 dark:text-neutral-600 leading-relaxed mt-2">※タイム予測の有効範囲は1500m〜フルマラソン程度です（短距離・ウルトラマラソンは対象外）</p>
+            <button id="vdot-predict-help-toggle" type="button" aria-expanded="false"
+              class="mt-2 inline-flex items-center gap-1 text-[10px] text-neutral-400 dark:text-neutral-600 active:text-neutral-600 dark:active:text-neutral-300">
+              もっと詳しく
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-3 h-3">
+                <circle cx="12" cy="12" r="9"></circle>
+                <path d="M9.5 9a2.5 2.5 0 0 1 4.9.7c0 1.7-2.4 1.8-2.4 3.3"></path>
+                <circle cx="12" cy="17" r="0.6" fill="currentColor" stroke="none"></circle>
+              </svg>
+            </button>
+            <p id="vdot-predict-help-text" class="hidden text-[10px] text-neutral-500 dark:text-neutral-400 leading-relaxed mt-1">
+              入力した距離から、あなたの現在のエンジン（心肺機能）の強さを計算しています。予想タイムに届かない場合は、エンジンの問題ではなく、その距離を走り切るための「脚作り（スタミナ）」が不足しているサインかもしれません。EペースやTペースの練習を活用して、スタミナを育てていきましょう。
+            </p>
+            <p class="text-[9px] text-neutral-400 dark:text-neutral-600 leading-relaxed mt-2">※有効範囲は1500m〜フルマラソン程度です（短距離・ウルトラマラソンは対象外）</p>
           </div>
         </div>
       </div>
@@ -1266,6 +1281,8 @@
     vdotPredictToggle = vdotModalOverlay.querySelector('#vdot-predict-toggle');
     vdotPredictPanel = vdotModalOverlay.querySelector('#vdot-predict-panel');
     vdotPredictListEl = vdotModalOverlay.querySelector('#vdot-predict-list');
+    vdotPredictHelpToggle = vdotModalOverlay.querySelector('#vdot-predict-help-toggle');
+    vdotPredictHelpText = vdotModalOverlay.querySelector('#vdot-predict-help-text');
 
     VDOT_PREDICT_DISTANCES.forEach((d) => {
       const row = document.createElement('div');
@@ -1288,6 +1305,12 @@
       vdotPredictToggle.setAttribute('aria-expanded', String(!expanded));
       vdotPredictPanel.classList.toggle('hidden', expanded);
       vdotPredictToggle.querySelector('.vdot-predict-chevron').classList.toggle('rotate-180', !expanded);
+    });
+
+    vdotPredictHelpToggle.addEventListener('click', () => {
+      const expanded = vdotPredictHelpToggle.getAttribute('aria-expanded') === 'true';
+      vdotPredictHelpToggle.setAttribute('aria-expanded', String(!expanded));
+      vdotPredictHelpText.classList.toggle('hidden', expanded);
     });
 
     const zoneListEl = vdotModalOverlay.querySelector('#vdot-zone-list');

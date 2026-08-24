@@ -2,14 +2,14 @@
 
 // css/js の ?v=N とあわせて、更新のたびにこの番号を上げること。
 // 変えないと、古いキャッシュが端末に残り続けてしまう。
-const CACHE_VERSION = 'v10';
+const CACHE_VERSION = 'v11';
 const CACHE_NAME = `pace-converter-${CACHE_VERSION}`;
 
 const PRECACHE_URLS = [
   './',
   './index.html',
-  './css/style.css?v=10',
-  './js/app.js?v=10',
+  './css/style.css?v=11',
+  './js/app.js?v=11',
   './manifest.webmanifest',
   './favicon.svg',
   './favicon.ico',

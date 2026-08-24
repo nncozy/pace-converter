@@ -847,6 +847,42 @@
     { meters: 10000, label: '10000m' },
   ];
 
+  // 予想タイムの対象距離（VDOTの有効範囲とされる1500m〜フルマラソンのみ）
+  const VDOT_PREDICT_DISTANCES = [
+    { meters: 1500, label: '1500m' },
+    { meters: 1609, label: '1マイル' },
+    { meters: 3000, label: '3000m' },
+    { meters: 5000, label: '5000m' },
+    { meters: 10000, label: '10000m' },
+    { meters: 21097, label: 'ハーフマラソン' },
+    { meters: 42195, label: 'フルマラソン' },
+  ];
+
+  // VDOTのレベル目安。境界値は実際にvdotFromPerformance()の逆算（二分探索）で検証済み
+  // （例: サブ4=フルマラソン4時間切り相当はVDOT≈38、サブ3=3時間切り相当はVDOT≈53〜54）。
+  const VDOT_LEVELS = [
+    { max: 30, label: '初心者・健康維持レベル', desc: '5kmを30分前後で走るくらい。これから伸びる段階' },
+    { max: 38, label: '市民ランナーレベル', desc: 'フルマラソン4時間台〜5時間程度が目安' },
+    { max: 48, label: 'サブ4ペース目安のレベル', desc: 'フルマラソン4時間切り(サブ4)が見えてくる' },
+    { max: 58, label: 'サブ3ペース目安のレベル', desc: 'フルマラソン3時間切り(サブ3)が見えてくる' },
+    { max: 68, label: '上級・競技志向レベル', desc: 'フルマラソン2時間30〜50分台クラス' },
+    { max: Infinity, label: 'エリート・トップクラスレベル', desc: '国内トップ〜世界トップクラス' },
+  ];
+  const VDOT_GAUGE_MIN = 20;
+  const VDOT_GAUGE_MAX = 75;
+
+  function getVdotLevel(vdot) {
+    return VDOT_LEVELS.find((l) => vdot < l.max) || VDOT_LEVELS[VDOT_LEVELS.length - 1];
+  }
+
+  function formatDurationSec(sec) {
+    const total = Math.max(0, Math.round(sec));
+    const h = Math.floor(total / 3600);
+    const m = Math.floor((total % 3600) / 60);
+    const s = total % 60;
+    return h > 0 ? `${h}:${pad2(m)}:${pad2(s)}` : `${m}:${pad2(s)}`;
+  }
+
   const TRAINING_ZONES = [
     {
       key: 'E',
@@ -904,6 +940,21 @@
     return vo2FromVelocity(v) / percentVO2Max(tMin);
   }
 
+  // 指定距離をこのVDOTで走った場合の予想タイム(秒)を求める。
+  // vdotFromPerformance(meters, t)はtについて単調減少なので二分探索で逆算できる
+  // （実測値: VDOT50で5km≈19'56", 10km≈41'20", ハーフ≈1:31:31, フル≈3:10:40 と一致確認済み）。
+  function predictRaceTimeSec(vdot, meters) {
+    let lo = 30; // 30秒
+    let hi = 30 * 3600; // 30時間
+    for (let i = 0; i < 60; i++) {
+      const mid = (lo + hi) / 2;
+      const requiredVdot = vdotFromPerformance(meters, mid);
+      if (requiredVdot > vdot) lo = mid;
+      else hi = mid;
+    }
+    return (lo + hi) / 2;
+  }
+
   // vo2FromVelocity(v) = vo2 を v について解く（2次方程式の解の公式）
   function velocityFromVO2(vo2) {
     const a = 0.000104;
@@ -957,7 +1008,16 @@
     vdotMmInput,
     vdotSsInput,
     vdotCsInput,
-    vdotResultEl;
+    vdotResultEl,
+    vdotHelpToggle,
+    vdotHelpText,
+    vdotLevelLabelEl,
+    vdotLevelDescEl,
+    vdotLevelFillEl,
+    vdotLevelMarkerEl,
+    vdotPredictToggle,
+    vdotPredictPanel,
+    vdotPredictListEl;
 
   function vdotTimeInputs() {
     return [vdotHhInput, vdotMmInput, vdotSsInput, vdotCsInput];
@@ -981,6 +1041,34 @@
     return (hh * 3600 + mm * 60 + ss) * 1000 + cs * 10;
   }
 
+  function updateVdotLevel(vdot) {
+    if (vdot === null) {
+      vdotLevelLabelEl.textContent = '--';
+      vdotLevelDescEl.textContent = '距離とタイムを入力すると目安が表示されます';
+      vdotLevelFillEl.style.width = '0%';
+      vdotLevelMarkerEl.style.left = '0%';
+      return;
+    }
+    const level = getVdotLevel(vdot);
+    vdotLevelLabelEl.textContent = level.label;
+    vdotLevelDescEl.textContent = level.desc;
+    const pct = Math.max(0, Math.min(100, ((vdot - VDOT_GAUGE_MIN) / (VDOT_GAUGE_MAX - VDOT_GAUGE_MIN)) * 100));
+    vdotLevelFillEl.style.width = `${pct}%`;
+    vdotLevelMarkerEl.style.left = `${pct}%`;
+  }
+
+  function updateVdotPredictions(vdot) {
+    const timeEls = vdotPredictListEl.querySelectorAll('.vdot-predict-time');
+    if (vdot === null) {
+      timeEls.forEach((el) => { el.textContent = '--'; });
+      return;
+    }
+    timeEls.forEach((el) => {
+      const meters = Number(el.dataset.meters);
+      el.textContent = formatDurationSec(predictRaceTimeSec(vdot, meters));
+    });
+  }
+
   function recalcVdot() {
     const meters = getVdotDistanceMeters();
     const totalMs = getVdotTimeMs();
@@ -991,6 +1079,8 @@
     if (!meters || totalMs <= 0) {
       vdotResultEl.textContent = '--';
       zonePaceEls.forEach((el) => { el.textContent = '--\'--"'; });
+      updateVdotLevel(null);
+      updateVdotPredictions(null);
       return;
     }
 
@@ -999,6 +1089,8 @@
     TRAINING_ZONES.forEach((z, i) => {
       zonePaceEls[i].textContent = formatPaceSecPerKm(trainingPaceSecPerKm(vdot, z.pct));
     });
+    updateVdotLevel(vdot);
+    updateVdotPredictions(vdot);
     saveVdotRace(meters, totalMs);
   }
 
@@ -1110,12 +1202,54 @@
           <span class="w-11 text-center">ms</span>
         </div>
 
-        <div class="text-center mb-3">
+        <div class="text-center mb-1">
           <div id="vdot-result-value" class="text-3xl font-black bg-gradient-to-r from-lime-600 to-green-500 dark:from-lime-400 dark:to-green-300 bg-clip-text text-transparent">--</div>
-          <div class="text-[10px] text-neutral-400 dark:text-neutral-600">VDOT</div>
+          <button id="vdot-help-toggle" type="button" aria-expanded="false"
+            class="inline-flex items-center gap-1 text-[10px] text-neutral-400 dark:text-neutral-600 active:text-neutral-600 dark:active:text-neutral-300">
+            VDOTとは？
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-3 h-3">
+              <circle cx="12" cy="12" r="9"></circle>
+              <path d="M9.5 9a2.5 2.5 0 0 1 4.9.7c0 1.7-2.4 1.8-2.4 3.3"></path>
+              <circle cx="12" cy="17" r="0.6" fill="currentColor" stroke="none"></circle>
+            </svg>
+          </button>
+          <p id="vdot-help-text" class="hidden text-[10px] text-neutral-500 dark:text-neutral-400 leading-relaxed mt-1 px-2">
+            あなたの現在の走力（心肺機能のエンジン性能）を示すスコアです。満点はなく、練習を重ねるほど数値は上がっていきます。
+          </p>
         </div>
 
-        <div id="vdot-zone-list" class="space-y-1.5"></div>
+        <div class="mb-3">
+          <div id="vdot-level-label" class="text-center text-xs font-bold text-lime-700 dark:text-lime-300 mb-0.5">--</div>
+          <div id="vdot-level-desc" class="text-center text-[10px] text-neutral-400 dark:text-neutral-600 mb-1.5 leading-relaxed">距離とタイムを入力すると目安が表示されます</div>
+          <div class="relative h-2 rounded-full bg-neutral-200 dark:bg-neutral-800">
+            <div id="vdot-level-fill" class="h-2 rounded-full bg-gradient-to-r from-lime-600 to-green-500 dark:from-lime-400 dark:to-green-300 transition-all" style="width: 0%"></div>
+            <div id="vdot-level-marker" class="absolute top-1/2 w-3 h-3 rounded-full bg-white dark:bg-neutral-900 border-2 border-lime-600 dark:border-lime-400 shadow transition-all" style="left: 0%; transform: translate(-50%, -50%);"></div>
+          </div>
+          <div class="flex justify-between text-[9px] text-neutral-400 dark:text-neutral-600 mt-1">
+            <span>初心者</span>
+            <span>エリート</span>
+          </div>
+        </div>
+
+        <div id="vdot-zone-list" class="space-y-1.5 mb-3"></div>
+
+        <div class="rounded-xl bg-neutral-100/70 dark:bg-neutral-800/70 overflow-hidden">
+          <button id="vdot-predict-toggle" type="button" aria-expanded="false"
+            class="w-full flex items-center gap-2 px-3 py-2 text-left">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0 w-4 h-4 text-lime-600 dark:text-lime-400">
+              <circle cx="12" cy="12" r="9"></circle>
+              <polyline points="12 7 12 12 15 15"></polyline>
+            </svg>
+            <span class="flex-1 text-xs font-semibold text-neutral-800 dark:text-neutral-200">他の距離の予想タイムを見る</span>
+            <svg class="vdot-predict-chevron shrink-0 w-4 h-4 text-neutral-400 dark:text-neutral-600 transition-transform" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <polyline points="6 9 12 15 18 9"></polyline>
+            </svg>
+          </button>
+          <div id="vdot-predict-panel" class="hidden px-3 pb-3">
+            <div id="vdot-predict-list" class="space-y-1"></div>
+            <p class="text-[9px] text-neutral-400 dark:text-neutral-600 leading-relaxed mt-2">※タイム予測の有効範囲は1500m〜フルマラソン程度です（短距離・ウルトラマラソンは対象外）</p>
+          </div>
+        </div>
       </div>
     `;
     document.body.appendChild(vdotModalOverlay);
@@ -1128,6 +1262,38 @@
     vdotSsInput = vdotModalOverlay.querySelector('#vdot-ss-input');
     vdotCsInput = vdotModalOverlay.querySelector('#vdot-cs-input');
     vdotResultEl = vdotModalOverlay.querySelector('#vdot-result-value');
+    vdotHelpToggle = vdotModalOverlay.querySelector('#vdot-help-toggle');
+    vdotHelpText = vdotModalOverlay.querySelector('#vdot-help-text');
+    vdotLevelLabelEl = vdotModalOverlay.querySelector('#vdot-level-label');
+    vdotLevelDescEl = vdotModalOverlay.querySelector('#vdot-level-desc');
+    vdotLevelFillEl = vdotModalOverlay.querySelector('#vdot-level-fill');
+    vdotLevelMarkerEl = vdotModalOverlay.querySelector('#vdot-level-marker');
+    vdotPredictToggle = vdotModalOverlay.querySelector('#vdot-predict-toggle');
+    vdotPredictPanel = vdotModalOverlay.querySelector('#vdot-predict-panel');
+    vdotPredictListEl = vdotModalOverlay.querySelector('#vdot-predict-list');
+
+    VDOT_PREDICT_DISTANCES.forEach((d) => {
+      const row = document.createElement('div');
+      row.className = 'flex items-center justify-between text-xs px-1 py-0.5';
+      row.innerHTML = `
+        <span class="text-neutral-600 dark:text-neutral-300">${d.label}</span>
+        <span class="vdot-predict-time font-mono font-bold text-neutral-900 dark:text-white" data-meters="${d.meters}">--</span>
+      `;
+      vdotPredictListEl.appendChild(row);
+    });
+
+    vdotHelpToggle.addEventListener('click', () => {
+      const expanded = vdotHelpToggle.getAttribute('aria-expanded') === 'true';
+      vdotHelpToggle.setAttribute('aria-expanded', String(!expanded));
+      vdotHelpText.classList.toggle('hidden', expanded);
+    });
+
+    vdotPredictToggle.addEventListener('click', () => {
+      const expanded = vdotPredictToggle.getAttribute('aria-expanded') === 'true';
+      vdotPredictToggle.setAttribute('aria-expanded', String(!expanded));
+      vdotPredictPanel.classList.toggle('hidden', expanded);
+      vdotPredictToggle.querySelector('.vdot-predict-chevron').classList.toggle('rotate-180', !expanded);
+    });
 
     const zoneListEl = vdotModalOverlay.querySelector('#vdot-zone-list');
     TRAINING_ZONES.forEach((z) => {

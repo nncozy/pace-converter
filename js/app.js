@@ -16,12 +16,12 @@
   const SEPARATOR = { hh: ':', mm: ':', ss: '.', cs: '' };
 
   const SUN_ICON = `
-    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-4.5 h-4.5">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-5 h-5">
       <circle cx="12" cy="12" r="4"></circle>
       <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"></path>
     </svg>`;
   const MOON_ICON = `
-    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-4.5 h-4.5">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-5 h-5">
       <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
     </svg>`;
 
@@ -344,8 +344,10 @@
         getInput(meters, unit).value = '';
       });
     });
-    const first = listEl.querySelector('.pace-input');
-    if (first) first.focus();
+    // フォーカスを残したままだとモバイルで数字キーボードが開いたままになるため外す
+    if (document.activeElement && document.activeElement.classList.contains('pace-input')) {
+      document.activeElement.blur();
+    }
   }
 
   // ---------- テーマ切り替え ----------

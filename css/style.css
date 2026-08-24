@@ -1,0 +1,40 @@
+/* Pace Converter - custom styles (Tailwind CDN handles the rest) */
+
+html, body {
+  overscroll-behavior-y: none;
+}
+
+body {
+  font-feature-settings: "tnum" 1;
+}
+
+/* Remove number input spinners for a cleaner, running-watch-like look */
+.pace-input::-webkit-outer-spin-button,
+.pace-input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+.pace-input {
+  -moz-appearance: textfield;
+  appearance: textfield;
+  font-variant-numeric: tabular-nums;
+  caret-color: #a3e635; /* lime-400 */
+}
+
+.pace-input:focus {
+  background-color: #171717; /* neutral-900 */
+}
+
+/* Larger tap targets and no accidental text selection highlight on rapid taps */
+.pace-input {
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+}
+
+/* Distance card subtle press feedback */
+.distance-card {
+  transition: border-color 120ms ease, background-color 120ms ease;
+}
+.distance-card:focus-within {
+  border-color: #a3e635; /* lime-400 */
+}

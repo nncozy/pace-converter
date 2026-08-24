@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="theme-color" content="#0a0a0a">
+<meta name="description" content="距離のタイムを入力すると、同じペースで走った場合の他の距離のタイムを瞬時に自動計算するランナー向けツール。">
+<title>ペース相互換算計算機 | Pace Converter</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body class="bg-neutral-950 text-white min-h-screen antialiased">
+  <div class="max-w-md mx-auto px-4 pt-6 pb-16">
+    <header class="mb-6 text-center">
+      <h1 class="text-2xl font-extrabold tracking-tight text-lime-400">PACE CONVERTER</h1>
+      <p class="text-xs text-neutral-400 mt-1">
+        どこかの距離のタイムを入力すると、同じペースの他の距離のタイムが自動計算されます
+      </p>
+    </header>
+
+    <div id="distance-list" class="space-y-3"></div>
+
+    <div class="mt-6 flex justify-center">
+      <button id="reset-btn" type="button"
+        class="px-5 py-2.5 rounded-full border border-neutral-700 text-neutral-300 text-sm font-medium active:bg-neutral-800 active:scale-95 transition">
+        すべてリセット
+      </button>
+    </div>
+
+    <footer class="mt-8 text-center text-[11px] leading-relaxed text-neutral-600">
+      <p>hh : mm : ss . ミリ秒（2桁）の形式で入力してください。</p>
+      <p>2桁入力すると自動的に次の欄へ移動します。</p>
+    </footer>
+  </div>
+
+  <script src="js/app.js"></script>
+</body>
+</html>

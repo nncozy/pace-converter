@@ -91,14 +91,43 @@
   }
 
   // ドラッグ&ドロップで確定した表示順(距離のmeters配列)を永続化する。
-  // 非表示中の距離は今回のドラッグ対象外なので、既存の並びを保ったまま末尾に付け直す。
+  // 非表示中の距離は今回のドラッグ対象外だが、末尾に押し出すと再表示時に
+  // 元の場所を見失うため、並び替え前に直前にあった表示中の距離のすぐ後ろ
+  // という相対位置を保ったまま挿入し直す。
   function persistVisibleOrder(orderedMeters) {
-    orderedMeters.forEach((meters, i) => {
+    const before = sortedDistances();
+    const hiddenAfter = new Map(); // 直前の表示中distanceのmeters(先頭ならnull) -> 非表示distanceのmeters配列
+    let lastVisible = null;
+    before.forEach((d) => {
+      if (d.visible) {
+        lastVisible = d.meters;
+      } else {
+        if (!hiddenAfter.has(lastVisible)) hiddenAfter.set(lastVisible, []);
+        hiddenAfter.get(lastVisible).push(d.meters);
+      }
+    });
+
+    const result = [];
+    const appendHiddenAfter = (anchor) => {
+      const list = hiddenAfter.get(anchor);
+      if (list) {
+        result.push(...list);
+        hiddenAfter.delete(anchor);
+      }
+    };
+
+    appendHiddenAfter(null);
+    orderedMeters.forEach((meters) => {
+      result.push(meters);
+      appendHiddenAfter(meters);
+    });
+    // アンカーだった距離が削除済みなどで行き場のなかった非表示距離は末尾に付ける
+    hiddenAfter.forEach((list) => result.push(...list));
+
+    result.forEach((meters, i) => {
       const d = distances.find((x) => x.meters === meters);
       if (d) d.order = i;
     });
-    const hidden = distances.filter((d) => !d.visible).sort((a, b) => a.order - b.order);
-    hidden.forEach((d, i) => { d.order = orderedMeters.length + i; });
     saveDistances();
   }
 

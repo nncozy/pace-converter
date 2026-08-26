@@ -1267,10 +1267,10 @@
 
   let modalReturnFocusEl = null;
 
-  function focusModalOnOpen(panel, triggerEl, preferredEl) {
+  function focusModalOnOpen(panel, triggerEl) {
     modalReturnFocusEl = triggerEl || document.activeElement;
     const closeBtn = panel.querySelector('button[aria-label="閉じる"]');
-    (preferredEl || closeBtn || panel).focus();
+    (closeBtn || panel).focus();
   }
 
   function restoreFocusOnClose() {
@@ -2034,10 +2034,9 @@
     vdotModalOverlay.classList.remove('hidden');
     vdotModalOverlay.classList.add('flex');
     document.body.classList.add('modal-open');
-    // 距離が決まっている(前回の保存あり)ならタイム欄から、まだなら距離欄から
-    // 入力を始められるようにする(タップ回数を減らすため)
-    const firstFieldToFocus = saved ? vdotMmInput : vdotDistanceSelect;
-    focusModalOnOpen(vdotModalOverlay.querySelector('#vdot-modal-panel'), vdotBtn, firstFieldToFocus);
+    // 入力欄に自動でフォーカスすると、意図せずカーソルが飛んだりモバイルの
+    // キーボードが勝手に開いたりして煩わしいため、閉じるボタンへ留める
+    focusModalOnOpen(vdotModalOverlay.querySelector('#vdot-modal-panel'), vdotBtn);
   }
 
   function closeVdotModal() {

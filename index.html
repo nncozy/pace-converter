@@ -128,12 +128,27 @@
     </footer>
   </div>
 
-  <script src="js/app.js?v=16"></script>
+  <script src="js/app.js?v=17"></script>
   <script>
     // 電波の弱い場所でも起動できるよう、アプリ本体をService Workerでキャッシュする
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {
-        navigator.serviceWorker.register('service-worker.js').catch(() => {});
+        navigator.serviceWorker.register('service-worker.js').then((reg) => {
+          // ブラウザは通常ページの新規読み込み時にしか更新を確認しないため、
+          // タスク切り替えなどでアプリに戻ってきたタイミングでも明示的にチェックする
+          document.addEventListener('visibilitychange', () => {
+            if (document.visibilityState === 'visible') reg.update().catch(() => {});
+          });
+        }).catch(() => {});
+      });
+
+      // 新しいService Workerが有効になったら、表示中の内容を最新にするため
+      // 一度だけ再読み込みする(でないと更新に気づいてもらえない)
+      let refreshingForUpdate = false;
+      navigator.serviceWorker.addEventListener('controllerchange', () => {
+        if (refreshingForUpdate) return;
+        refreshingForUpdate = true;
+        window.location.reload();
       });
     }
   </script>

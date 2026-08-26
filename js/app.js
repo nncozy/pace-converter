@@ -66,6 +66,11 @@
   const appTitleEl = document.getElementById('app-title');
   const headerPaceBtn = document.getElementById('header-pace');
   const headerPaceValueEl = headerPaceBtn.querySelector('.header-pace-value');
+  const viewTitleEl = document.getElementById('view-title');
+  const backBtn = document.getElementById('back-btn');
+  const helpBtn = document.getElementById('help-btn');
+  const mainViewEl = document.getElementById('view-main');
+  const helpViewEl = document.getElementById('view-help');
 
   // 現在の基準ペース（ms/m）。未入力なら null。
   let currentPace = null;
@@ -1527,14 +1532,16 @@
       if (chip) togglePresetDistance(Number(chip.dataset.meters));
     });
 
-    modalOverlay.querySelector('#distance-modal-close').addEventListener('click', closeModal);
+    // 閉じる操作はすべて履歴を1つ戻す形にそろえる。端末の戻るジェスチャと
+    // ✕・背景タップ・Escape が同じ結果になるようにするため。
+    modalOverlay.querySelector('#distance-modal-close').addEventListener('click', goBack);
     modalOverlay.addEventListener('click', (e) => {
-      if (e.target === modalOverlay) closeModal();
+      if (e.target === modalOverlay) goBack();
     });
     document.addEventListener('keydown', (e) => {
       if (modalOverlay.classList.contains('hidden')) return;
       if (e.key === 'Escape') {
-        closeModal();
+        goBack();
         return;
       }
       trapFocusKeydown(modalOverlay.querySelector('#distance-modal-panel'), e);
@@ -1660,6 +1667,8 @@
   // triggerEl は閉じたときにフォーカスを戻す先。ヘッダーの編集ボタンと
   // 一覧末尾のショートカットのどちらから開いたかで戻り先が変わる。
   function openModal(triggerEl) {
+    // ルーターから毎回呼ばれるので、開いている間の再描画で入力中の値を飛ばさない
+    if (!modalOverlay.classList.contains('hidden')) return;
     renderModalList();
     renderPresetChips();
     modalOverlay.classList.remove('hidden');
@@ -1671,6 +1680,7 @@
   }
 
   function closeModal() {
+    if (modalOverlay.classList.contains('hidden')) return;
     modalOverlay.classList.add('hidden');
     modalOverlay.classList.remove('flex');
     document.body.classList.remove('modal-open');
@@ -1853,7 +1863,7 @@
     }
   }
 
-  let vdotModalOverlay,
+  let trainingViewEl,
     vdotDistanceSelect,
     vdotImportBtn,
     vdotImportLabel,
@@ -1865,16 +1875,14 @@
     vdotCsInput,
     vdotResultEl,
     vdotRangeWarningEl,
-    vdotHelpToggle,
-    vdotHelpText,
     vdotLevelLabelEl,
     vdotLevelDescEl,
     vdotLevelFillEl,
-    vdotPredictToggle,
-    vdotPredictPanel,
     vdotPredictListEl,
-    vdotPredictHelpToggle,
-    vdotPredictHelpText;
+    zonesTabBtn,
+    predictTabBtn,
+    zonesPanelEl,
+    predictPanelEl;
 
   function vdotTimeInputs() {
     return [vdotHhInput, vdotMmInput, vdotSsInput, vdotCsInput];
@@ -1936,7 +1944,7 @@
     const meters = getVdotDistanceMeters();
     const totalMs = getVdotTimeMs();
     const zonePaceEls = TRAINING_ZONES.map((z) =>
-      vdotModalOverlay.querySelector(`.vdot-zone-pace[data-zone="${z.key}"]`)
+      trainingViewEl.querySelector(`.vdot-zone-pace[data-zone="${z.key}"]`)
     );
 
     if (!meters || totalMs <= 0) {
@@ -2020,27 +2028,13 @@
     if (e.target.classList.contains('vdot-time-input')) e.target.select();
   }
 
-  function buildVdotModal() {
-    vdotModalOverlay = document.createElement('div');
-    vdotModalOverlay.id = 'vdot-modal-overlay';
-    vdotModalOverlay.className =
-      'fixed inset-0 z-50 hidden items-end sm:items-center justify-center bg-black/60 px-0 sm:px-4';
-    vdotModalOverlay.innerHTML = `
-      <div id="vdot-modal-panel" role="dialog" aria-modal="true" aria-labelledby="vdot-modal-title" tabindex="-1" class="w-full sm:max-w-sm sm:rounded-3xl rounded-t-3xl bg-white/95 dark:bg-neutral-900/95 backdrop-blur-sm border border-lime-600/10 dark:border-lime-400/10 shadow-2xl shadow-lime-900/10 dark:shadow-black/50 p-4 max-h-[85vh] overflow-y-auto outline-none">
-        <div class="flex items-center justify-between mb-3">
-          <h2 id="vdot-modal-title" class="text-base font-bold text-neutral-900 dark:text-white">VDOTトレーニングペース</h2>
-          <button id="vdot-modal-close" type="button" aria-label="閉じる"
-            class="w-8 h-8 flex items-center justify-center rounded-full text-neutral-500 dark:text-neutral-400 active:bg-neutral-100 dark:active:bg-neutral-800">
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-5 h-5">
-              <line x1="18" y1="6" x2="6" y2="18"></line>
-              <line x1="6" y1="6" x2="18" y2="18"></line>
-            </svg>
-          </button>
-        </div>
-        <p class="text-xs text-neutral-500 dark:text-neutral-400 mb-1 leading-relaxed">直近のレース結果を入力すると、フィットネス指標「VDOT」と5つのトレーニングペースの目安を計算します。使わなくてもタイム換算機能は普通に使えます。</p>
-        <p class="text-[10px] text-neutral-400 dark:text-neutral-600 mb-3 leading-relaxed">各ペースの名前をタップすると、練習の目安ややり方が見られます。</p>
+  function buildTrainingView() {
+    trainingViewEl = document.getElementById('view-training');
+    trainingViewEl.innerHTML = `
+      <section class="pt-4">
+        <h2 class="section-heading">直近のレース結果</h2>
 
-        <button id="vdot-import-btn" type="button" hidden class="btn-secondary w-full mb-3">
+        <button id="vdot-import-btn" type="button" hidden class="btn-secondary w-full mb-2.5">
           <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-4 h-4">
             <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
             <polyline points="7 10 12 15 17 10"></polyline>
@@ -2049,127 +2043,108 @@
           <span id="vdot-import-label">メイン画面の入力を取り込む</span>
         </button>
 
-        <label class="block text-xs font-semibold text-neutral-500 dark:text-neutral-400 mb-1">距離</label>
+        <label for="vdot-distance-select" class="block text-xs font-semibold text-neutral-500 dark:text-neutral-400 mb-1">距離</label>
         <select id="vdot-distance-select"
-          class="w-full bg-neutral-100 dark:bg-neutral-800 rounded-xl px-3 py-2 text-sm text-neutral-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-lime-600 dark:focus:ring-lime-400 mb-2">
+          class="w-full bg-neutral-100 dark:bg-neutral-800 rounded-xl px-3 py-2.5 text-sm text-neutral-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-lime-600 dark:focus:ring-lime-400 mb-2">
           ${VDOT_PRESET_DISTANCES.map((d) => `<option value="${d.meters}">${d.label}</option>`).join('')}
           <option value="custom">その他（距離を指定）</option>
         </select>
-        <div id="vdot-custom-distance-wrap" class="hidden mb-3">
+        <div id="vdot-custom-distance-wrap" class="hidden mb-2">
           <input id="vdot-custom-distance-input" type="number" min="1" max="${MAX_METERS}" step="1" inputmode="numeric"
-            placeholder="距離 (m)" autocomplete="off"
-            class="w-full bg-neutral-100 dark:bg-neutral-800 rounded-xl px-3 py-2 text-sm text-neutral-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-lime-600 dark:focus:ring-lime-400">
+            placeholder="距離 (m)" autocomplete="off" aria-label="距離 (m)"
+            class="w-full bg-neutral-100 dark:bg-neutral-800 rounded-xl px-3 py-2.5 text-sm text-neutral-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-lime-600 dark:focus:ring-lime-400">
         </div>
 
-        <label class="block text-xs font-semibold text-neutral-500 dark:text-neutral-400 mb-1 mt-1">タイム</label>
-        <div class="flex items-center justify-center gap-0.5 mb-1">
+        <span class="block text-xs font-semibold text-neutral-500 dark:text-neutral-400 mb-1 mt-2">タイム</span>
+        <div class="flex items-center justify-center gap-0.5">
           <input id="vdot-hh-input" type="number" inputmode="numeric" pattern="[0-9]*" min="0" max="99" placeholder="--" autocomplete="off" aria-label="時"
-            class="vdot-time-input w-11 bg-neutral-200 dark:bg-neutral-800 rounded-xl text-center text-lg font-mono py-2 focus:outline-none focus:ring-2 focus:ring-lime-600 dark:focus:ring-lime-400 text-neutral-900 dark:text-white transition-shadow" data-vdot-unit="hh">
+            class="vdot-time-input w-12 bg-neutral-200 dark:bg-neutral-800 rounded-xl text-center text-lg font-mono py-2 focus:outline-none focus:ring-2 focus:ring-lime-600 dark:focus:ring-lime-400 text-neutral-900 dark:text-white transition-shadow" data-vdot-unit="hh">
           <span class="text-neutral-400 dark:text-neutral-500 font-mono text-lg px-0.5">:</span>
           <input id="vdot-mm-input" type="number" inputmode="numeric" pattern="[0-9]*" min="0" max="59" placeholder="--" autocomplete="off" aria-label="分"
-            class="vdot-time-input w-11 bg-neutral-200 dark:bg-neutral-800 rounded-xl text-center text-lg font-mono py-2 focus:outline-none focus:ring-2 focus:ring-lime-600 dark:focus:ring-lime-400 text-neutral-900 dark:text-white transition-shadow" data-vdot-unit="mm">
+            class="vdot-time-input w-12 bg-neutral-200 dark:bg-neutral-800 rounded-xl text-center text-lg font-mono py-2 focus:outline-none focus:ring-2 focus:ring-lime-600 dark:focus:ring-lime-400 text-neutral-900 dark:text-white transition-shadow" data-vdot-unit="mm">
           <span class="text-neutral-400 dark:text-neutral-500 font-mono text-lg px-0.5">:</span>
           <input id="vdot-ss-input" type="number" inputmode="numeric" pattern="[0-9]*" min="0" max="59" placeholder="--" autocomplete="off" aria-label="秒"
-            class="vdot-time-input w-11 bg-neutral-200 dark:bg-neutral-800 rounded-xl text-center text-lg font-mono py-2 focus:outline-none focus:ring-2 focus:ring-lime-600 dark:focus:ring-lime-400 text-neutral-900 dark:text-white transition-shadow" data-vdot-unit="ss">
+            class="vdot-time-input w-12 bg-neutral-200 dark:bg-neutral-800 rounded-xl text-center text-lg font-mono py-2 focus:outline-none focus:ring-2 focus:ring-lime-600 dark:focus:ring-lime-400 text-neutral-900 dark:text-white transition-shadow" data-vdot-unit="ss">
           <span class="text-neutral-400 dark:text-neutral-500 font-mono text-lg px-0.5">.</span>
           <input id="vdot-cs-input" type="number" inputmode="numeric" pattern="[0-9]*" min="0" max="99" placeholder="--" autocomplete="off" aria-label="ミリ秒"
-            class="vdot-time-input w-11 bg-neutral-200 dark:bg-neutral-800 rounded-xl text-center text-lg font-mono py-2 focus:outline-none focus:ring-2 focus:ring-lime-600 dark:focus:ring-lime-400 text-neutral-900 dark:text-white transition-shadow" data-vdot-unit="cs">
+            class="vdot-time-input w-12 bg-neutral-200 dark:bg-neutral-800 rounded-xl text-center text-lg font-mono py-2 focus:outline-none focus:ring-2 focus:ring-lime-600 dark:focus:ring-lime-400 text-neutral-900 dark:text-white transition-shadow" data-vdot-unit="cs">
         </div>
-        <div class="flex justify-center gap-0.5 mb-3 text-[10px] text-neutral-400 dark:text-neutral-600 font-mono">
-          <span class="w-11 text-center">時</span><span class="w-3"></span>
-          <span class="w-11 text-center">分</span><span class="w-3"></span>
-          <span class="w-11 text-center">秒</span><span class="w-3"></span>
-          <span class="w-11 text-center">ms</span>
+        <div class="flex justify-center gap-0.5 mt-1 text-[10px] text-neutral-400 dark:text-neutral-600 font-mono">
+          <span class="w-12 text-center">時</span><span class="w-3"></span>
+          <span class="w-12 text-center">分</span><span class="w-3"></span>
+          <span class="w-12 text-center">秒</span><span class="w-3"></span>
+          <span class="w-12 text-center">ms</span>
         </div>
+      </section>
 
-        <div class="text-center mb-1">
-          <div id="vdot-result-value" aria-live="polite"
-            class="text-3xl font-black bg-gradient-to-r from-lime-600 to-green-500 dark:from-lime-400 dark:to-green-300 bg-clip-text text-transparent">--</div>
-          <p id="vdot-range-warning" class="hidden mt-1 mb-1 px-2.5 py-1.5 rounded-lg text-[10px] leading-relaxed text-amber-700 dark:text-amber-300 bg-amber-500/10 dark:bg-amber-400/10"></p>
-          <button id="vdot-help-toggle" type="button" aria-expanded="false"
-            class="inline-flex items-center gap-1 -mx-3 px-3 py-3 rounded-lg text-[10px] text-neutral-400 dark:text-neutral-600 active:text-neutral-600 dark:active:text-neutral-300 active:bg-neutral-200/60 dark:active:bg-neutral-700/60">
-            VDOTとは？
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-3 h-3">
-              <circle cx="12" cy="12" r="9"></circle>
-              <path d="M9.5 9a2.5 2.5 0 0 1 4.9.7c0 1.7-2.4 1.8-2.4 3.3"></path>
-              <circle cx="12" cy="17" r="0.6" fill="currentColor" stroke="none"></circle>
-            </svg>
-          </button>
-          <p id="vdot-help-text" class="hidden text-[10px] text-neutral-500 dark:text-neutral-400 leading-relaxed mt-1 px-2">
-            あなたの現在の走力（心肺機能のエンジン性能）を示すスコアです。満点はなく、練習を重ねるほど数値は上がっていきます。
-          </p>
+      <!-- 2つのタブの共通の前提になる数値なので、タブの外に置いて切り替えでも消さない -->
+      <section class="mt-3 rounded-2xl border border-lime-600/15 dark:border-lime-400/15 bg-white/70 dark:bg-neutral-900/70 px-3.5 py-3">
+        <div class="flex items-baseline justify-center gap-2">
+          <span class="text-[10px] font-black tracking-widest text-neutral-400 dark:text-neutral-600 uppercase">VDOT</span>
+          <span id="vdot-result-value" aria-live="polite"
+            class="text-3xl font-black leading-none bg-gradient-to-r from-lime-600 to-green-500 dark:from-lime-400 dark:to-green-300 bg-clip-text text-transparent">--</span>
         </div>
-
-        <div class="mb-3" aria-live="polite">
-          <div id="vdot-level-label" class="text-center text-xs font-bold text-lime-700 dark:text-lime-300 mb-0.5">--</div>
+        <p id="vdot-range-warning" class="hidden mt-1.5 px-2.5 py-1.5 rounded-lg text-[10px] leading-relaxed text-amber-700 dark:text-amber-300 bg-amber-500/10 dark:bg-amber-400/10"></p>
+        <div class="mt-1.5" aria-live="polite">
+          <div id="vdot-level-label" class="text-center text-xs font-bold text-lime-700 dark:text-lime-300">--</div>
           <div id="vdot-level-desc" class="text-center text-[10px] text-neutral-400 dark:text-neutral-600 mb-1.5 leading-relaxed">距離とタイムを入力すると目安が表示されます</div>
-          <div class="h-2 rounded-full bg-neutral-200 dark:bg-neutral-800">
-            <div id="vdot-level-fill" class="h-2 rounded-full bg-gradient-to-r from-lime-600 to-green-500 dark:from-lime-400 dark:to-green-300 transition-all" style="width: 0%"></div>
+          <div class="h-1.5 rounded-full bg-neutral-200 dark:bg-neutral-800">
+            <div id="vdot-level-fill" class="h-1.5 rounded-full bg-gradient-to-r from-lime-600 to-green-500 dark:from-lime-400 dark:to-green-300 transition-all" style="width: 0%"></div>
           </div>
           <div class="flex justify-between text-[9px] text-neutral-400 dark:text-neutral-600 mt-1">
             <span>初心者</span>
             <span>エリート</span>
           </div>
         </div>
+      </section>
 
-        <div id="vdot-zone-list" class="space-y-1.5 mb-3"></div>
-
-        <div class="rounded-xl bg-neutral-100/70 dark:bg-neutral-800/70 overflow-hidden">
-          <button id="vdot-predict-toggle" type="button" aria-expanded="false"
-            class="w-full flex items-center gap-2 px-3.5 py-3.5 text-left">
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0 w-4 h-4 text-lime-600 dark:text-lime-400">
-              <circle cx="12" cy="12" r="9"></circle>
-              <polyline points="12 7 12 12 15 15"></polyline>
-            </svg>
-            <span class="flex-1 text-xs font-semibold text-neutral-800 dark:text-neutral-200">他の距離のポテンシャルタイムを見る</span>
-            <svg class="vdot-predict-chevron shrink-0 w-4 h-4 text-neutral-400 dark:text-neutral-600 transition-transform" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <polyline points="6 9 12 15 18 9"></polyline>
-            </svg>
-          </button>
-          <div id="vdot-predict-panel" class="hidden px-3 pb-3">
-            <p class="text-[10px] text-neutral-500 dark:text-neutral-400 leading-relaxed mb-2">※これは持久力トレーニングを積んだ場合に発揮できる「ポテンシャル」の目安です。今すぐ出せるタイムを保証するものではありません。</p>
-            <div id="vdot-predict-list" class="space-y-1"></div>
-            <button id="vdot-predict-help-toggle" type="button" aria-expanded="false"
-              class="mt-2 -mx-3 px-3 py-3 rounded-lg inline-flex items-center gap-1 text-[10px] text-neutral-400 dark:text-neutral-600 active:text-neutral-600 dark:active:text-neutral-300 active:bg-neutral-200/60 dark:active:bg-neutral-700/60">
-              もっと詳しく
-              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-3 h-3">
-                <circle cx="12" cy="12" r="9"></circle>
-                <path d="M9.5 9a2.5 2.5 0 0 1 4.9.7c0 1.7-2.4 1.8-2.4 3.3"></path>
-                <circle cx="12" cy="17" r="0.6" fill="currentColor" stroke="none"></circle>
-              </svg>
-            </button>
-            <p id="vdot-predict-help-text" class="hidden text-[10px] text-neutral-500 dark:text-neutral-400 leading-relaxed mt-1">
-              入力した距離から、あなたの現在のエンジン（心肺機能）の強さを計算しています。ポテンシャルタイムに届かない場合は、エンジンの問題ではなく、その距離を走り切るための「脚作り（スタミナ）」が不足しているサインかもしれません。EペースやTペースの練習を活用して、スタミナを育てていきましょう。
-            </p>
-            <p class="text-[9px] text-neutral-400 dark:text-neutral-600 leading-relaxed mt-2">※有効範囲は1500m〜フルマラソン程度です（短距離・ウルトラマラソンは対象外）</p>
-          </div>
-        </div>
+      <!-- 練習ペースとポテンシャルタイムは同じ入力から出る対等な2つの結果。
+           縦に直列させると後ろ側が800px下に沈むので、横に並べて1タップで行き来させる。 -->
+      <div role="tablist" aria-label="トレーニングペースの表示切り替え" class="seg-tabs sticky top-[3.25rem] z-20 mt-3">
+        <button type="button" role="tab" id="tab-zones" aria-controls="panel-zones" aria-selected="true" class="seg-tab">練習ペース</button>
+        <button type="button" role="tab" id="tab-predict" aria-controls="panel-predict" aria-selected="false" class="seg-tab">ポテンシャルタイム</button>
       </div>
-    `;
-    document.body.appendChild(vdotModalOverlay);
 
-    vdotDistanceSelect = vdotModalOverlay.querySelector('#vdot-distance-select');
-    vdotImportBtn = vdotModalOverlay.querySelector('#vdot-import-btn');
-    vdotImportLabel = vdotModalOverlay.querySelector('#vdot-import-label');
+      <section id="panel-zones" role="tabpanel" aria-labelledby="tab-zones" tabindex="0" class="mt-3 outline-none">
+        <p class="text-[10px] text-neutral-400 dark:text-neutral-600 leading-relaxed mb-2">各ペースの名前をタップすると、練習の目安ややり方が見られます。</p>
+        <div id="vdot-zone-list" class="space-y-1.5"></div>
+      </section>
+
+      <section id="panel-predict" role="tabpanel" aria-labelledby="tab-predict" tabindex="0" hidden class="mt-3 outline-none">
+        <p class="text-[10px] text-neutral-500 dark:text-neutral-400 leading-relaxed mb-2">※これは持久力トレーニングを積んだ場合に発揮できる「ポテンシャル」の目安です。今すぐ出せるタイムを保証するものではありません。</p>
+        <div id="vdot-predict-list" class="space-y-1"></div>
+        <p class="text-[9px] text-neutral-400 dark:text-neutral-600 leading-relaxed mt-2">※有効範囲は1,500m〜フルマラソン程度です（短距離・ウルトラマラソンは対象外）</p>
+        <button id="vdot-predict-help-btn" type="button" class="btn-ghost mt-2">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-3.5 h-3.5">
+            <circle cx="12" cy="12" r="9"></circle>
+            <path d="M9.5 9a2.5 2.5 0 0 1 4.9.7c0 1.7-2.4 1.8-2.4 3.3"></path>
+            <circle cx="12" cy="17" r="0.6" fill="currentColor" stroke="none"></circle>
+          </svg>
+          ポテンシャルタイムの読み方
+        </button>
+      </section>
+    `;
+
+    vdotDistanceSelect = trainingViewEl.querySelector('#vdot-distance-select');
+    vdotImportBtn = trainingViewEl.querySelector('#vdot-import-btn');
+    vdotImportLabel = trainingViewEl.querySelector('#vdot-import-label');
     vdotImportBtn.addEventListener('click', importMainInputIntoVdot);
-    vdotCustomWrap = vdotModalOverlay.querySelector('#vdot-custom-distance-wrap');
-    vdotCustomInput = vdotModalOverlay.querySelector('#vdot-custom-distance-input');
-    vdotHhInput = vdotModalOverlay.querySelector('#vdot-hh-input');
-    vdotMmInput = vdotModalOverlay.querySelector('#vdot-mm-input');
-    vdotSsInput = vdotModalOverlay.querySelector('#vdot-ss-input');
-    vdotCsInput = vdotModalOverlay.querySelector('#vdot-cs-input');
-    vdotResultEl = vdotModalOverlay.querySelector('#vdot-result-value');
-    vdotRangeWarningEl = vdotModalOverlay.querySelector('#vdot-range-warning');
-    vdotHelpToggle = vdotModalOverlay.querySelector('#vdot-help-toggle');
-    vdotHelpText = vdotModalOverlay.querySelector('#vdot-help-text');
-    vdotLevelLabelEl = vdotModalOverlay.querySelector('#vdot-level-label');
-    vdotLevelDescEl = vdotModalOverlay.querySelector('#vdot-level-desc');
-    vdotLevelFillEl = vdotModalOverlay.querySelector('#vdot-level-fill');
-    vdotPredictToggle = vdotModalOverlay.querySelector('#vdot-predict-toggle');
-    vdotPredictPanel = vdotModalOverlay.querySelector('#vdot-predict-panel');
-    vdotPredictListEl = vdotModalOverlay.querySelector('#vdot-predict-list');
-    vdotPredictHelpToggle = vdotModalOverlay.querySelector('#vdot-predict-help-toggle');
-    vdotPredictHelpText = vdotModalOverlay.querySelector('#vdot-predict-help-text');
+    vdotCustomWrap = trainingViewEl.querySelector('#vdot-custom-distance-wrap');
+    vdotCustomInput = trainingViewEl.querySelector('#vdot-custom-distance-input');
+    vdotHhInput = trainingViewEl.querySelector('#vdot-hh-input');
+    vdotMmInput = trainingViewEl.querySelector('#vdot-mm-input');
+    vdotSsInput = trainingViewEl.querySelector('#vdot-ss-input');
+    vdotCsInput = trainingViewEl.querySelector('#vdot-cs-input');
+    vdotResultEl = trainingViewEl.querySelector('#vdot-result-value');
+    vdotRangeWarningEl = trainingViewEl.querySelector('#vdot-range-warning');
+    vdotLevelLabelEl = trainingViewEl.querySelector('#vdot-level-label');
+    vdotLevelDescEl = trainingViewEl.querySelector('#vdot-level-desc');
+    vdotLevelFillEl = trainingViewEl.querySelector('#vdot-level-fill');
+    vdotPredictListEl = trainingViewEl.querySelector('#vdot-predict-list');
+    zonesTabBtn = trainingViewEl.querySelector('#tab-zones');
+    predictTabBtn = trainingViewEl.querySelector('#tab-predict');
+    zonesPanelEl = trainingViewEl.querySelector('#panel-zones');
+    predictPanelEl = trainingViewEl.querySelector('#panel-predict');
 
     VDOT_PREDICT_DISTANCES.forEach((d) => {
       const row = document.createElement('div');
@@ -2181,26 +2156,14 @@
       vdotPredictListEl.appendChild(row);
     });
 
-    vdotHelpToggle.addEventListener('click', () => {
-      const expanded = vdotHelpToggle.getAttribute('aria-expanded') === 'true';
-      vdotHelpToggle.setAttribute('aria-expanded', String(!expanded));
-      vdotHelpText.classList.toggle('hidden', expanded);
+
+
+    // 読み方の解説は使い方画面に集約したので、ここからはそこへ送るだけにする
+    trainingViewEl.querySelector('#vdot-predict-help-btn').addEventListener('click', (e) => {
+      openView('help', e.currentTarget);
     });
 
-    vdotPredictToggle.addEventListener('click', () => {
-      const expanded = vdotPredictToggle.getAttribute('aria-expanded') === 'true';
-      vdotPredictToggle.setAttribute('aria-expanded', String(!expanded));
-      vdotPredictPanel.classList.toggle('hidden', expanded);
-      vdotPredictToggle.querySelector('.vdot-predict-chevron').classList.toggle('rotate-180', !expanded);
-    });
-
-    vdotPredictHelpToggle.addEventListener('click', () => {
-      const expanded = vdotPredictHelpToggle.getAttribute('aria-expanded') === 'true';
-      vdotPredictHelpToggle.setAttribute('aria-expanded', String(!expanded));
-      vdotPredictHelpText.classList.toggle('hidden', expanded);
-    });
-
-    const zoneListEl = vdotModalOverlay.querySelector('#vdot-zone-list');
+    const zoneListEl = trainingViewEl.querySelector('#vdot-zone-list');
     TRAINING_ZONES.forEach((z) => {
       const row = document.createElement('div');
       row.className = 'rounded-xl bg-neutral-100/70 dark:bg-neutral-800/70 overflow-hidden';
@@ -2233,25 +2196,23 @@
       btn.querySelector('.vdot-zone-chevron').classList.toggle('rotate-180', !expanded);
     });
 
-    vdotModalOverlay.querySelector('#vdot-modal-close').addEventListener('click', closeVdotModal);
-    vdotModalOverlay.addEventListener('click', (e) => {
-      if (e.target === vdotModalOverlay) closeVdotModal();
-    });
-    document.addEventListener('keydown', (e) => {
-      if (vdotModalOverlay.classList.contains('hidden')) return;
-      if (e.key === 'Escape') {
-        closeVdotModal();
-        return;
-      }
-      trapFocusKeydown(vdotModalOverlay.querySelector('#vdot-modal-panel'), e);
+    zonesTabBtn.addEventListener('click', () => selectTrainingTab('zones'));
+    predictTabBtn.addEventListener('click', () => selectTrainingTab('predict'));
+    // タブは左右キーでも移動できるのが約束事なので合わせておく
+    [zonesTabBtn, predictTabBtn].forEach((btn) => {
+      btn.addEventListener('keydown', (e) => {
+        if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
+        e.preventDefault();
+        selectTrainingTab(e.key === 'ArrowLeft' ? 'zones' : 'predict', true);
+      });
     });
 
     vdotDistanceSelect.addEventListener('change', onVdotDistanceChange);
     vdotCustomInput.addEventListener('input', recalcVdot);
-    vdotModalOverlay.addEventListener('input', onVdotTimeInput);
-    vdotModalOverlay.addEventListener('keydown', onVdotTimeKeydown);
-    vdotModalOverlay.addEventListener('focusout', onVdotTimeFocusOut);
-    vdotModalOverlay.addEventListener('focusin', onVdotTimeFocusIn);
+    trainingViewEl.addEventListener('input', onVdotTimeInput);
+    trainingViewEl.addEventListener('keydown', onVdotTimeKeydown);
+    trainingViewEl.addEventListener('focusout', onVdotTimeFocusOut);
+    trainingViewEl.addEventListener('focusin', onVdotTimeFocusIn);
   }
 
   // メイン画面で「基準」になっている距離とタイム。取り込みボタンの出し分けに使う。
@@ -2289,7 +2250,8 @@
     showToast(`${formatMeters(src.meters)}の入力を取り込みました`);
   }
 
-  function openVdotModal() {
+  // トレーニングペース画面に入るたびに、保存済みのレース結果と取り込みボタンを整える
+  function enterTrainingView() {
     const saved = loadVdotRace();
     if (saved) {
       applyVdotRace(saved.meters, saved.totalMs);
@@ -2309,19 +2271,18 @@
     }
 
     recalcVdot();
-    vdotModalOverlay.classList.remove('hidden');
-    vdotModalOverlay.classList.add('flex');
-    document.body.classList.add('modal-open');
-    // 入力欄に自動でフォーカスすると、意図せずカーソルが飛んだりモバイルの
-    // キーボードが勝手に開いたりして煩わしいため、閉じるボタンへ留める
-    focusModalOnOpen(vdotModalOverlay.querySelector('#vdot-modal-panel'), vdotBtn);
   }
 
-  function closeVdotModal() {
-    vdotModalOverlay.classList.add('hidden');
-    vdotModalOverlay.classList.remove('flex');
-    document.body.classList.remove('modal-open');
-    restoreFocusOnClose();
+  // 2つのタブは同じ入力から出る対等な結果なので、切り替えても入力とVDOTは残す
+  function selectTrainingTab(name, focusTab) {
+    const showPredict = name === 'predict';
+    zonesTabBtn.setAttribute('aria-selected', String(!showPredict));
+    predictTabBtn.setAttribute('aria-selected', String(showPredict));
+    zonesTabBtn.tabIndex = showPredict ? -1 : 0;
+    predictTabBtn.tabIndex = showPredict ? 0 : -1;
+    zonesPanelEl.hidden = showPredict;
+    predictPanelEl.hidden = !showPredict;
+    if (focusTab) (showPredict ? predictTabBtn : zonesTabBtn).focus();
   }
 
   // ---------- 初回向けの案内とヘッダー ----------
@@ -2369,12 +2330,98 @@
   let heroOffScreen = false;
 
   function syncHeaderPace() {
-    const show = heroOffScreen && currentPace !== null && currentPace > 0;
+    // サブ画面ではヘッダー中央は画面名の場所なので、ペースは出さない
+    const show =
+      currentRoute() === 'main' && heroOffScreen && currentPace !== null && currentPace > 0;
     // h1をhiddenで消すと、スクロール中だけページから見出しが無くなり、
     // 見出し送りで移動している人が迷子になる。場所だけ譲って中身は残す。
     appTitleEl.classList.toggle('sr-only', show);
     headerPaceBtn.hidden = !show;
     headerPaceBtn.classList.toggle('flex', show);
+  }
+
+  // ---------- 画面遷移（ハッシュルーティング） ----------
+  //
+  // HTMLファイルは増やさない。増やすと Service Worker のプリキャッシュ対象と
+  // ?v=N の同期先が画面の数だけ増えるうえ（README にある通りここが一番の事故元）、
+  // テーマ確定のインラインスクリプトも全ファイルに複製することになる。
+  // 代わりにハッシュで画面を切り替え、端末の「戻る」とURL共有だけは本物にする。
+
+  const VIEW_TITLES = { training: 'トレーニングペース', help: '使い方' };
+  // sticky ヘッダーの高さ。ヒーローが「ヘッダーの下に隠れた」判定に使う
+  const HEADER_HEIGHT_PX = 64;
+  const KNOWN_ROUTES = ['training', 'help', 'distances'];
+
+  let openedInApp = false; // 直前の履歴が自分のものか（=history.back()で戻れるか）
+  let viewReturnFocus = null;
+  let mainScrollY = 0;
+  let lastBaseView = null;
+
+  function currentRoute() {
+    const raw = (location.hash || '').replace(/^#\/?/, '');
+    return KNOWN_ROUTES.indexOf(raw) === -1 ? 'main' : raw;
+  }
+
+  // triggerEl は戻ってきたときにフォーカスを返す先。タップだと activeElement が
+  // body のままの環境があるので、呼び出し側から明示的に渡す。
+  function openView(name, triggerEl) {
+    viewReturnFocus = triggerEl || document.activeElement;
+    openedInApp = true;
+    location.hash = name;
+  }
+
+  function goBack() {
+    if (openedInApp) {
+      history.back();
+      return;
+    }
+    // 共有されたURLを直接開いた場合など、戻る先が自分の履歴でないときは
+    // 相手の履歴を消費せずにハッシュだけ落とす（replaceStateはhashchangeを出さない）
+    history.replaceState(null, '', location.pathname + location.search);
+    applyRoute();
+  }
+
+  function applyRoute() {
+    const route = currentRoute();
+    // 距離の編集はメイン画面に重ねるシートなので、下地はメインのまま
+    const baseView = route === 'distances' ? 'main' : route;
+    const isMain = baseView === 'main';
+
+    if (lastBaseView === 'main' && baseView !== 'main') mainScrollY = window.scrollY;
+
+    mainViewEl.hidden = !isMain;
+    trainingViewEl.hidden = baseView !== 'training';
+    helpViewEl.hidden = baseView !== 'help';
+
+    // ヘッダーの左と中央だけを画面に合わせて差し替える。テーマ切り替えは動かさない。
+    editDistancesBtn.hidden = !isMain;
+    backBtn.hidden = isMain;
+    appTitleEl.hidden = !isMain;
+    viewTitleEl.hidden = isMain;
+    if (!isMain) viewTitleEl.textContent = VIEW_TITLES[baseView] || '';
+
+    if (baseView === 'training') enterTrainingView();
+    if (route === 'distances') openModal(viewReturnFocus || editDistancesBtn);
+    else closeModal();
+
+    if (baseView !== lastBaseView) {
+      // 前の画面のスクロール位置のまま次の画面を出すと途中から始まって迷子になる。
+      // メインへ戻るときだけは、見ていた場所へ戻す。
+      window.scrollTo(0, isMain ? mainScrollY : 0);
+      if (isMain) {
+        // サブ画面の間はヒーローが非表示なので、監視側は「画面外」のまま止まっている。
+        // 監視の次の通知を待つと、戻った直後の1フレームだけヘッダーにペースが出てしまう。
+        heroOffScreen = paceHeroEl.getBoundingClientRect().bottom < HEADER_HEIGHT_PX;
+        openedInApp = false;
+        if (viewReturnFocus && document.contains(viewReturnFocus)) viewReturnFocus.focus();
+        viewReturnFocus = null;
+      } else {
+        backBtn.focus();
+      }
+      lastBaseView = baseView;
+    }
+
+    syncHeaderPace();
   }
 
   function initHeaderPaceSwap() {
@@ -2390,7 +2437,7 @@
         syncHeaderPace();
       },
       // ヘッダーの下に隠れた時点で「画面外」とみなす
-      { rootMargin: '-64px 0px 0px 0px', threshold: 0 }
+      { rootMargin: `-${HEADER_HEIGHT_PX}px 0px 0px 0px`, threshold: 0 }
     );
     observer.observe(paceHeroEl);
   }
@@ -2439,11 +2486,22 @@
 
     buildToast();
     buildModal();
-    editDistancesBtn.addEventListener('click', () => openModal(editDistancesBtn));
-    addDistanceShortcutBtn.addEventListener('click', () => openModal(addDistanceShortcutBtn));
+    editDistancesBtn.addEventListener('click', () => openView('distances', editDistancesBtn));
+    addDistanceShortcutBtn.addEventListener('click', () => openView('distances', addDistanceShortcutBtn));
 
-    buildVdotModal();
-    vdotBtn.addEventListener('click', openVdotModal);
+    buildTrainingView();
+    vdotBtn.addEventListener('click', () => openView('training', vdotBtn));
+    helpBtn.addEventListener('click', () => openView('help', helpBtn));
+    backBtn.addEventListener('click', goBack);
+    // サブ画面でも Escape は「1つ戻る」。距離編集シート側は自前で拾うので除く。
+    document.addEventListener('keydown', (e) => {
+      if (e.key !== 'Escape') return;
+      if (!modalOverlay.classList.contains('hidden')) return;
+      if (currentRoute() === 'main') return;
+      goBack();
+    });
+    window.addEventListener('hashchange', applyRoute);
+    applyRoute();
   }
 
   init();

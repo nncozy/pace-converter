@@ -334,6 +334,143 @@ body.modal-open {
   overflow: hidden;
 }
 
+/* ---------- 画面の見出し ---------- */
+
+.section-heading {
+  font-size: 0.8125rem;
+  font-weight: 700;
+  color: #404040;
+  margin-bottom: 0.5rem;
+}
+html.dark .section-heading {
+  color: #d4d4d4;
+}
+
+/* ---------- セグメントタブ ----------
+   練習ペースとポテンシャルタイムは同じ入力から出る対等な2つの結果。
+   縦に積むと後ろ側が畳まれて800px下に沈むので、横に並べて1タップで行き来させる。 */
+
+.seg-tabs {
+  display: flex;
+  gap: 0.25rem;
+  padding: 0.25rem;
+  border-radius: 9999px;
+  background: rgba(0, 0, 0, 0.05);
+  /* スクロールしても切り替えに手が届くよう、ヘッダーのすぐ下に貼り付ける */
+  backdrop-filter: blur(8px);
+}
+html.dark .seg-tabs {
+  background: rgba(255, 255, 255, 0.07);
+}
+
+.seg-tab {
+  flex: 1 1 0;
+  min-width: 0;
+  padding: 0.5rem 0.5rem;
+  border-radius: 9999px;
+  border: none;
+  background: transparent;
+  font-size: 0.8125rem;
+  font-weight: 700;
+  color: #737373;
+  white-space: nowrap;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition: background-color 140ms ease, color 140ms ease, box-shadow 140ms ease;
+}
+html.dark .seg-tab {
+  color: #a3a3a3;
+}
+.seg-tab[aria-selected='true'] {
+  background: #fff;
+  color: #3f6212;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.12);
+}
+html.dark .seg-tab[aria-selected='true'] {
+  background: #383838;
+  color: #bef264;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.5);
+}
+.seg-tab:focus-visible {
+  outline: 2px solid #65a30d;
+  outline-offset: 2px;
+}
+html.dark .seg-tab:focus-visible {
+  outline-color: #a3e635;
+}
+
+/* ---------- 使い方画面 ---------- */
+
+.help-heading {
+  font-size: 0.9375rem;
+  font-weight: 800;
+  color: #4d7c0f;
+  margin-bottom: 0.5rem;
+}
+html.dark .help-heading {
+  color: #bef264;
+}
+.help-body {
+  font-size: 0.75rem;
+  line-height: 1.85;
+  color: #525252;
+}
+html.dark .help-body {
+  color: #a3a3a3;
+}
+.help-body + .help-body {
+  margin-top: 0.625rem;
+}
+.help-body b,
+.help-list b {
+  font-weight: 700;
+  color: #262626;
+}
+html.dark .help-body b,
+html.dark .help-list b {
+  color: #e5e5e5;
+}
+.help-list {
+  list-style: disc;
+  padding-left: 1.125rem;
+  font-size: 0.75rem;
+  line-height: 1.85;
+  color: #525252;
+}
+html.dark .help-list {
+  color: #a3a3a3;
+}
+.help-list li + li {
+  margin-top: 0.375rem;
+}
+.help-list li::marker {
+  color: #65a30d;
+}
+html.dark .help-list li::marker {
+  color: #a3e635;
+}
+.help-note {
+  margin-top: 0.5rem;
+  font-size: 0.6875rem;
+  line-height: 1.7;
+  color: #a3a3a3;
+}
+html.dark .help-note {
+  color: #737373;
+}
+.help-body code,
+.help-list code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.9em;
+  padding: 0.05rem 0.3rem;
+  border-radius: 0.25rem;
+  background: rgba(0, 0, 0, 0.06);
+}
+html.dark .help-body code,
+html.dark .help-list code {
+  background: rgba(255, 255, 255, 0.09);
+}
+
 /* ---------- モーダル ---------- */
 
 /* よく使う距離のワンタップ追加チップ。押すと「入っている／入っていない」が

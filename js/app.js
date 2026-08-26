@@ -26,6 +26,27 @@
       <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
     </svg>`;
 
+  const PIN_ICON = `
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-[18px] h-[18px]">
+      <path d="M12 17v5"></path>
+      <path d="M9 10.76V5h6v5.76a2 2 0 0 0 .55 1.38L17 13.5V17H7v-3.5l1.45-1.36A2 2 0 0 0 9 10.76Z"></path>
+      <path d="M7 5h10"></path>
+    </svg>`;
+  const UNPIN_ICON = `
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-[18px] h-[18px]">
+      <path d="M12 17v5"></path>
+      <path d="M9 10.76V5h6v5.76a2 2 0 0 0 .55 1.38L17 13.5V17H7v-3.5l1.45-1.36A2 2 0 0 0 9 10.76Z"></path>
+      <path d="M7 5h10"></path>
+      <line x1="3" y1="3" x2="21" y2="21"></line>
+    </svg>`;
+  const EYE_OFF_ICON = `
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-[18px] h-[18px]">
+      <path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 10 8 10 8a18.5 18.5 0 0 1-2.16 3.19"></path>
+      <path d="M6.61 6.61A18.44 18.44 0 0 0 2 12s3 8 10 8a9.1 9.1 0 0 0 5.39-1.61"></path>
+      <path d="M14.12 14.12a3 3 0 1 1-4.24-4.24"></path>
+      <line x1="2" y1="2" x2="22" y2="22"></line>
+    </svg>`;
+
   const listEl = document.getElementById('distance-list');
   const resetBtn = document.getElementById('reset-btn');
   const themeToggleBtn = document.getElementById('theme-toggle-btn');
@@ -41,7 +62,7 @@
   // ---------- 距離リストの永続化 ----------
 
   function cloneDefaults() {
-    return DEFAULT_METERS.map((meters, i) => ({ meters, custom: false, visible: true, order: i }));
+    return DEFAULT_METERS.map((meters, i) => ({ meters, custom: false, visible: true, pinned: false, order: i }));
   }
 
   function loadDistances() {
@@ -56,8 +77,13 @@
           meters: Math.round(d.meters),
           custom: !!d.custom,
           visible: d.visible !== false,
+          pinned: !!d.pinned,
           order: Number.isFinite(d.order) ? d.order : null,
         }));
+      // 壊れた保存データで同じ距離が二重に入ると、カードもDOM上で二重になり
+      // getInput()が常に先頭だけを拾ってしまうので、ここで先勝ちで潰しておく
+      const seen = new Set();
+      cleaned = cleaned.filter((d) => (seen.has(d.meters) ? false : (seen.add(d.meters), true)));
       if (!cleaned.length) return cloneDefaults();
       // 表示順(order)を持たない古いデータからの移行: これまで通り距離の昇順を初期順にする
       if (cleaned.some((d) => d.order === null)) {
@@ -86,8 +112,10 @@
     return distances.slice().sort((a, b) => a.meters - b.meters);
   }
 
+  // ピン留めした距離は、order によらず常に一覧の先頭ブロックにまとめて表示する
   function visibleDistances() {
-    return sortedDistances().filter((d) => d.visible);
+    const visible = sortedDistances().filter((d) => d.visible);
+    return visible.filter((d) => d.pinned).concat(visible.filter((d) => !d.pinned));
   }
 
   // ドラッグ&ドロップで確定した表示順(距離のmeters配列)を永続化する。
@@ -138,6 +166,8 @@
     const idx = visible.findIndex((d) => d.meters === meters);
     const targetIdx = idx + direction;
     if (idx === -1 || targetIdx < 0 || targetIdx >= visible.length) return;
+    // ピン留めブロックとの境界は越えさせない（越えても描画時に戻されるため）
+    if (visible[idx].pinned !== visible[targetIdx].pinned) return;
 
     const newOrder = visible.map((d) => d.meters);
     [newOrder[idx], newOrder[targetIdx]] = [newOrder[targetIdx], newOrder[idx]];
@@ -182,7 +212,7 @@
       };
     }
     const maxOrder = distances.reduce((m, d) => Math.max(m, d.order), -1);
-    distances.push({ meters, custom: true, visible: true, order: maxOrder + 1 });
+    distances.push({ meters, custom: true, visible: true, pinned: false, order: maxOrder + 1 });
     saveDistances();
     return { ok: true };
   }
@@ -198,6 +228,48 @@
       d.visible = visible;
       saveDistances();
     }
+  }
+
+  function setPinned(meters, pinned) {
+    const d = distances.find((x) => x.meters === meters);
+    if (d) {
+      d.pinned = pinned;
+      saveDistances();
+    }
+  }
+
+  function isPinned(meters) {
+    const d = distances.find((x) => x.meters === meters);
+    return !!(d && d.pinned);
+  }
+
+  function formatMeters(meters) {
+    return `${meters.toLocaleString('ja-JP')}m`;
+  }
+
+  // 一覧の再描画は入力欄も作り直すため、ペースを描画後に必ず入れ直す
+  function refreshCards() {
+    renderCards();
+    applyPaceToAllVisible();
+  }
+
+  function togglePinDistance(meters) {
+    const next = !isPinned(meters);
+    setPinned(meters, next);
+    refreshCards();
+    showToast(
+      next ? `${formatMeters(meters)}をピン留めしました` : `${formatMeters(meters)}のピン留めを解除しました`
+    );
+  }
+
+  // 非表示は編集モーダルを開かないと戻せないので、取り消せるトーストを必ず出す
+  function hideDistance(meters) {
+    setVisibility(meters, false);
+    refreshCards();
+    showToast(`${formatMeters(meters)}を非表示にしました`, '元に戻す', () => {
+      setVisibility(meters, true);
+      refreshCards();
+    });
   }
 
   // ---------- 距離カード（メイン画面） ----------
@@ -269,6 +341,9 @@
 
   function renderCards() {
     const visible = visibleDistances();
+    // 作り直すと開いていたスワイプのDOMごと消えるので、参照を先に手放す
+    openSwipeCard = null;
+    if (swipe.card) detachSwipeListeners();
     listEl.innerHTML = '';
 
     if (visible.length === 0) {
@@ -281,12 +356,25 @@
 
     const frag = document.createDocumentFragment();
 
-    visible.forEach(({ meters }) => {
+    visible.forEach(({ meters, pinned }) => {
       const alt = altLabel(meters);
+      // 外枠はスワイプで現れるアクション面を切り抜くためのもので、
+      // 見た目(背景・枠線)は中の .card-surface 側が持ち、そこだけが横に動く
       const card = document.createElement('div');
       card.className =
-        'distance-card bg-white/90 dark:bg-neutral-900/90 backdrop-blur-sm rounded-2xl p-3.5 border border-lime-600/10 dark:border-lime-400/10 shadow-lg shadow-lime-900/5 dark:shadow-black/30';
+        'distance-card relative overflow-hidden rounded-2xl shadow-lg shadow-lime-900/5 dark:shadow-black/30' +
+        (pinned ? ' is-pinned' : '');
       card.dataset.distance = String(meters);
+      card.dataset.pinned = pinned ? '1' : '';
+
+      card.appendChild(buildSwipeAction('pin', meters, pinned));
+      card.appendChild(buildSwipeAction('hide', meters, pinned));
+
+      const surface = document.createElement('div');
+      surface.className =
+        // 背面のスワイプ用アクションが透けないよう、カード面は不透明にする
+        'card-surface relative bg-white dark:bg-neutral-900 rounded-2xl p-3.5 border border-lime-600/10 dark:border-lime-400/10';
+      card.appendChild(surface);
 
       const header = document.createElement('div');
       header.className = 'flex items-center gap-2 mb-2';
@@ -303,9 +391,11 @@
           <span class="text-xs text-neutral-500 dark:text-neutral-500 font-normal">m</span>
           ${alt ? `<span class="text-[10px] text-neutral-400 dark:text-neutral-600 font-normal ml-1">(${alt})</span>` : ''}
         </div>
-        <span class="w-7 h-7 shrink-0" aria-hidden="true"></span>
+        ${pinned
+          ? `<span class="w-7 h-7 shrink-0 flex items-center justify-center text-lime-600 dark:text-lime-400" role="img" aria-label="ピン留め中">${PIN_ICON}</span>`
+          : '<span class="w-7 h-7 shrink-0" aria-hidden="true"></span>'}
       `;
-      card.appendChild(header);
+      surface.appendChild(header);
 
       const row = document.createElement('div');
       row.className = 'flex items-center justify-center gap-0.5';
@@ -338,7 +428,7 @@
         row.appendChild(input);
       });
 
-      card.appendChild(row);
+      surface.appendChild(row);
 
       const labels = document.createElement('div');
       labels.className =
@@ -354,7 +444,7 @@
         l.textContent = UNIT_LABEL[unit];
         labels.appendChild(l);
       });
-      card.appendChild(labels);
+      surface.appendChild(labels);
 
       frag.appendChild(card);
     });
@@ -527,6 +617,281 @@
     }
   }
 
+  // ---------- トースト（取り消し付きの通知） ----------
+
+  let toastEl, toastMessageEl, toastActionBtn;
+  let toastTimer = null;
+  let toastAction = null;
+
+  function buildToast() {
+    toastEl = document.createElement('div');
+    toastEl.className =
+      'fixed left-1/2 -translate-x-1/2 bottom-[calc(1.25rem+env(safe-area-inset-bottom))] z-[60] hidden ' +
+      'items-center gap-3 max-w-[92vw] rounded-2xl px-4 py-2.5 text-xs font-semibold leading-snug shadow-xl shadow-black/30 ' +
+      'bg-neutral-900/95 text-white dark:bg-neutral-100/95 dark:text-neutral-900';
+    toastEl.setAttribute('role', 'status');
+    toastEl.innerHTML = `
+      <span class="toast-message"></span>
+      <button type="button" class="toast-action hidden shrink-0 font-bold underline underline-offset-2 text-lime-300 dark:text-lime-700"></button>
+    `;
+    document.body.appendChild(toastEl);
+    toastMessageEl = toastEl.querySelector('.toast-message');
+    toastActionBtn = toastEl.querySelector('.toast-action');
+    toastActionBtn.addEventListener('click', () => {
+      const fn = toastAction;
+      hideToast();
+      if (fn) fn();
+    });
+  }
+
+  function hideToast() {
+    if (toastTimer !== null) {
+      clearTimeout(toastTimer);
+      toastTimer = null;
+    }
+    toastAction = null;
+    toastEl.classList.add('hidden');
+    toastEl.classList.remove('flex');
+  }
+
+  function showToast(message, actionLabel, onAction) {
+    if (toastTimer !== null) clearTimeout(toastTimer);
+    toastMessageEl.textContent = message;
+    toastAction = onAction || null;
+    if (actionLabel && onAction) {
+      toastActionBtn.textContent = actionLabel;
+      toastActionBtn.classList.remove('hidden');
+    } else {
+      toastActionBtn.classList.add('hidden');
+    }
+    toastEl.classList.remove('hidden');
+    toastEl.classList.add('flex');
+    toastTimer = setTimeout(hideToast, 6000);
+  }
+
+  // ---------- カードの横スワイプ（右=ピン留め / 左=非表示） ----------
+  //
+  // LINEのトーク一覧と同じ操作感。指の動きに合わせてカードの面(.card-surface)を
+  // 横にずらし、その下から隠れているアクションボタンが現れる。少しだけずらして
+  // 離せばボタンが出たまま留まり(タップで実行)、大きくスワイプすればそのまま実行する。
+
+  const SWIPE_ACTION_WIDTH = 104; // アクションボタンの幅(px)。CSSの .swipe-action と合わせる
+  const SWIPE_DIRECTION_SLOP = 8; // 縦スクロールと横スワイプのどちらかを決めるまでの猶予(px)
+  const SWIPE_SETTLE_MS = 180;
+
+  let openSwipeCard = null;
+  const swipe = {
+    card: null,
+    surface: null,
+    pointerId: null,
+    startX: 0,
+    startY: 0,
+    baseX: 0,
+    dx: 0,
+    width: 0,
+    decided: false,
+    abandoned: false,
+  };
+
+  function swipeOffsetOf(card) {
+    return Number(card.dataset.swipeOffset || 0);
+  }
+
+  function setSwipeOffset(card, x, animate) {
+    const surface = card.querySelector('.card-surface');
+    if (!surface) return;
+    card.dataset.swipeOffset = String(x);
+    surface.style.transition = animate ? `transform ${SWIPE_SETTLE_MS}ms ease` : 'none';
+    surface.style.transform = x ? `translate3d(${x}px, 0, 0)` : '';
+    card.classList.toggle('swipe-armed', Math.abs(x) >= swipeFullThreshold(card));
+
+    // 動かした向きのアクションだけを見せる（両方見えていると何が起きるか分からない）。
+    // 閉じるアニメーション中はカード面がまだ動いている途中なので、隠すのは着地後にする。
+    if (x !== 0) {
+      card.classList.toggle('swipe-showing-pin', x > 0);
+      card.classList.toggle('swipe-showing-hide', x < 0);
+      openSwipeCard = card;
+    } else {
+      const hide = () => {
+        if (swipeOffsetOf(card) !== 0) return;
+        card.classList.remove('swipe-showing-pin', 'swipe-showing-hide');
+      };
+      if (animate) setTimeout(hide, SWIPE_SETTLE_MS);
+      else hide();
+      if (openSwipeCard === card) openSwipeCard = null;
+    }
+  }
+
+  function swipeFullThreshold(card) {
+    // 指を動かしている間はカード幅が変わらないので、計測済みの値を使い回して
+    // 毎フレームのレイアウト再計算を避ける
+    const width = swipe.card === card && swipe.width ? swipe.width : card.getBoundingClientRect().width;
+    return Math.max(SWIPE_ACTION_WIDTH + 40, width * 0.45);
+  }
+
+  function closeSwipe(card, animate) {
+    if (!card) return;
+    setSwipeOffset(card, 0, animate !== false);
+  }
+
+  function closeOpenSwipe() {
+    if (openSwipeCard) closeSwipe(openSwipeCard);
+  }
+
+  function detachSwipeListeners() {
+    if (!swipe.card) return;
+    swipe.card.removeEventListener('pointermove', onSwipePointerMove);
+    swipe.card.removeEventListener('pointerup', onSwipePointerUp);
+    swipe.card.removeEventListener('pointercancel', onSwipePointerCancel);
+    try {
+      if (swipe.pointerId !== null) swipe.card.releasePointerCapture(swipe.pointerId);
+    } catch (e) {}
+    swipe.card = null;
+    swipe.surface = null;
+    swipe.pointerId = null;
+    document.body.classList.remove('swiping');
+  }
+
+  function onSwipePointerDown(e) {
+    if (dragCard || swipe.card) return; // 並び替え中／多重スワイプはしない
+    if (e.pointerType === 'touch' && e.isPrimary === false) return;
+    if (e.target.closest('.drag-handle') || e.target.closest('.swipe-action')) return;
+    const card = e.target.closest('.distance-card');
+    if (!card) return;
+
+    if (openSwipeCard && openSwipeCard !== card) closeSwipe(openSwipeCard);
+
+    swipe.card = card;
+    swipe.surface = card.querySelector('.card-surface');
+    swipe.pointerId = e.pointerId;
+    swipe.startX = e.clientX;
+    swipe.startY = e.clientY;
+    swipe.baseX = swipeOffsetOf(card);
+    swipe.dx = swipe.baseX;
+    swipe.width = card.getBoundingClientRect().width;
+    swipe.decided = false;
+    swipe.abandoned = false;
+
+    card.addEventListener('pointermove', onSwipePointerMove);
+    card.addEventListener('pointerup', onSwipePointerUp);
+    card.addEventListener('pointercancel', onSwipePointerCancel);
+  }
+
+  function onSwipePointerMove(e) {
+    if (!swipe.card || e.pointerId !== swipe.pointerId || swipe.abandoned) return;
+    const dx = e.clientX - swipe.startX;
+    const dy = e.clientY - swipe.startY;
+
+    if (!swipe.decided) {
+      if (Math.abs(dx) < SWIPE_DIRECTION_SLOP && Math.abs(dy) < SWIPE_DIRECTION_SLOP) return;
+      if (Math.abs(dx) <= Math.abs(dy)) {
+        // 縦方向の動き -> 普通のスクロールとして扱い、以降このジェスチャには関与しない
+        swipe.abandoned = true;
+        return;
+      }
+      swipe.decided = true;
+      try {
+        swipe.card.setPointerCapture(e.pointerId);
+      } catch (err) {}
+      // 入力欄を触ったまま横に払われた場合、モバイルで数字キーボードが
+      // 開きっぱなしになるのでフォーカスを外す
+      const active = document.activeElement;
+      if (active && swipe.card.contains(active) && typeof active.blur === 'function') active.blur();
+      document.body.classList.add('swiping');
+    }
+
+    e.preventDefault();
+    const limit = swipe.width * 0.9;
+    swipe.dx = Math.max(-limit, Math.min(limit, swipe.baseX + dx));
+    setSwipeOffset(swipe.card, swipe.dx, false);
+  }
+
+  function onSwipePointerUp(e) {
+    if (!swipe.card || e.pointerId !== swipe.pointerId) return;
+    const card = swipe.card;
+    const meters = Number(card.dataset.distance);
+    const dx = swipe.dx;
+    const decided = swipe.decided;
+    const baseX = swipe.baseX;
+    detachSwipeListeners();
+
+    if (!decided) {
+      // 開いた状態のカードをただタップしたときは閉じる（LINEと同じ挙動）
+      if (baseX !== 0) closeSwipe(card);
+      return;
+    }
+
+    const full = swipeFullThreshold(card);
+    const openAt = SWIPE_ACTION_WIDTH * 0.5;
+
+    if (dx >= full) {
+      closeSwipe(card, false);
+      togglePinDistance(meters);
+    } else if (dx <= -full) {
+      collapseAndHide(card, meters);
+    } else if (dx >= openAt) {
+      setSwipeOffset(card, SWIPE_ACTION_WIDTH, true);
+    } else if (dx <= -openAt) {
+      setSwipeOffset(card, -SWIPE_ACTION_WIDTH, true);
+    } else {
+      closeSwipe(card);
+    }
+  }
+
+  function onSwipePointerCancel(e) {
+    if (!swipe.card || e.pointerId !== swipe.pointerId) return;
+    const card = swipe.card;
+    detachSwipeListeners();
+    closeSwipe(card);
+  }
+
+  // 大きく左に払い切ったときは、そのまま画面外へ抜けてから一覧を作り直す
+  function collapseAndHide(card, meters) {
+    const surface = card.querySelector('.card-surface');
+    if (!surface) {
+      hideDistance(meters);
+      return;
+    }
+    card.dataset.swipeOffset = '0';
+    surface.style.transition = `transform ${SWIPE_SETTLE_MS}ms ease, opacity ${SWIPE_SETTLE_MS}ms ease`;
+    surface.style.transform = `translate3d(${-card.getBoundingClientRect().width}px, 0, 0)`;
+    surface.style.opacity = '0';
+    setTimeout(() => hideDistance(meters), SWIPE_SETTLE_MS);
+  }
+
+  function onSwipeActionClick(e) {
+    const btn = e.target.closest('.swipe-action');
+    if (!btn) return;
+    e.preventDefault();
+    const card = btn.closest('.distance-card');
+    const meters = Number(btn.dataset.distance);
+    if (btn.dataset.swipeAction === 'pin') {
+      closeSwipe(card, false);
+      togglePinDistance(meters);
+    } else {
+      collapseAndHide(card, meters);
+    }
+  }
+
+  function buildSwipeAction(kind, meters, pinned) {
+    const isPin = kind === 'pin';
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.tabIndex = -1; // 閉じている間は見えないので、キーボードのタブ順には入れない
+    btn.setAttribute('aria-hidden', 'true');
+    btn.dataset.swipeAction = kind;
+    btn.dataset.distance = String(meters);
+    btn.className =
+      'swipe-action absolute inset-y-0 flex items-center w-[104px] text-white ' +
+      (isPin
+        ? 'left-0 justify-start pl-4 bg-gradient-to-r from-lime-600 to-green-500 dark:from-lime-500 dark:to-green-400'
+        : 'right-0 justify-end pr-4 bg-gradient-to-l from-neutral-500 to-neutral-400 dark:from-neutral-700 dark:to-neutral-600');
+    const label = isPin ? (pinned ? 'ピン解除' : 'ピン留め') : '非表示';
+    const icon = isPin ? (pinned ? UNPIN_ICON : PIN_ICON) : EYE_OFF_ICON;
+    btn.innerHTML = `<span class="flex flex-col items-center gap-0.5 leading-none">${icon}<span class="text-[10px] font-bold">${label}</span></span>`;
+    return btn;
+  }
+
   // ---------- カードの並び替え(ドラッグ&ドロップ) ----------
   //
   // position:fixed の left/top は動かさず固定し、指の移動量ぶんだけ
@@ -558,6 +923,7 @@
     const card = handle.closest('.distance-card');
     if (!card) return;
     e.preventDefault();
+    closeOpenSwipe();
 
     const rect = card.getBoundingClientRect();
     dragCard = card;
@@ -624,9 +990,14 @@
     const siblings = Array.from(listEl.children).filter(
       (el) => el !== dragPlaceholder && el !== dragCard && el.classList.contains('distance-card')
     );
+    // ピン留め中のカードは常に先頭ブロックにいるので、並び替えも同じブロック内に
+    // 限定する。そうしないと離した瞬間に描画順へ戻されて跳ねて見える。
+    const dragPinned = dragCard.dataset.pinned === '1';
+    const group = siblings.filter((el) => (el.dataset.pinned === '1') === dragPinned);
+    if (!group.length) return;
 
     let target = null;
-    for (const sib of siblings) {
+    for (const sib of group) {
       const r = sib.getBoundingClientRect();
       if (dragCenterY < r.top + r.height / 2) {
         target = sib;
@@ -634,13 +1005,16 @@
       }
     }
 
-    const needsMove = target
-      ? dragPlaceholder.nextSibling !== target
-      : listEl.lastElementChild !== dragPlaceholder;
-    if (needsMove) {
+    let ref = target;
+    if (!ref) {
+      // グループ末尾の次のノード(=もう一方のグループの先頭 or null)の前に置く
+      ref = group[group.length - 1].nextSibling;
+      while (ref === dragPlaceholder) ref = ref.nextSibling;
+    }
+
+    if (dragPlaceholder.nextSibling !== ref) {
       animateSiblingsReorder(() => {
-        if (target) listEl.insertBefore(dragPlaceholder, target);
-        else listEl.appendChild(dragPlaceholder);
+        listEl.insertBefore(dragPlaceholder, ref);
       });
     }
   }
@@ -786,7 +1160,7 @@
             </svg>
           </button>
         </div>
-        <p class="text-xs text-neutral-500 dark:text-neutral-400 mb-2">チェックを外すと一覧から非表示になります。</p>
+        <p class="text-xs text-neutral-500 dark:text-neutral-400 mb-2 leading-relaxed">チェックを外すと一覧から非表示になります。ピンのアイコンを押すと、その距離を一覧の先頭に固定できます。</p>
         <div id="distance-modal-list" class="flex-1 overflow-y-auto space-y-0.5 -mx-1 px-1"></div>
         <div class="mt-3 pt-3 border-t border-lime-600/10 dark:border-lime-400/10">
           <div class="flex gap-2">
@@ -837,13 +1211,21 @@
         const meters = Number(delBtn.dataset.meters);
         removeCustomDistance(meters);
         onDistancesChanged();
+        return;
+      }
+      const pinBtn = e.target.closest('.pin-distance-btn');
+      if (pinBtn) {
+        e.preventDefault(); // <label>内のボタンなのでチェックボックスに伝播させない
+        const meters = Number(pinBtn.dataset.meters);
+        setPinned(meters, !isPinned(meters));
+        onDistancesChanged();
       }
     });
   }
 
   function renderModalList() {
     modalList.innerHTML = '';
-    sortedByMeters().forEach(({ meters, visible, custom }) => {
+    sortedByMeters().forEach(({ meters, visible, custom, pinned }) => {
       const alt = altLabel(meters);
       const row = document.createElement('label');
       row.className =
@@ -855,15 +1237,23 @@
             ${meters.toLocaleString('ja-JP')}m${alt ? ` <span class="text-neutral-400 dark:text-neutral-600">(${alt})</span>` : ''}
           </span>
         </span>
-        ${custom
-          ? `<button type="button" data-meters="${meters}" aria-label="${meters}mを削除"
-              class="delete-distance-btn shrink-0 w-7 h-7 flex items-center justify-center rounded-full text-neutral-400 dark:text-neutral-600 active:text-red-500 active:bg-neutral-100 dark:active:bg-neutral-800">
-              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-4 h-4">
-                <polyline points="3 6 5 6 21 6"></polyline>
-                <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
-              </svg>
-            </button>`
-          : '<span class="w-7 h-7 shrink-0"></span>'}
+        <span class="flex items-center gap-0.5 shrink-0">
+          ${visible
+            ? `<button type="button" data-meters="${meters}" aria-pressed="${pinned ? 'true' : 'false'}" aria-label="${meters}mのピン留めを切り替え"
+                class="pin-distance-btn w-7 h-7 flex items-center justify-center rounded-full ${pinned ? 'text-lime-600 dark:text-lime-400' : 'text-neutral-300 dark:text-neutral-700'} active:bg-neutral-100 dark:active:bg-neutral-800">
+                ${PIN_ICON}
+              </button>`
+            : '<span class="w-7 h-7"></span>'}
+          ${custom
+            ? `<button type="button" data-meters="${meters}" aria-label="${meters}mを削除"
+                class="delete-distance-btn w-7 h-7 flex items-center justify-center rounded-full text-neutral-400 dark:text-neutral-600 active:text-red-500 active:bg-neutral-100 dark:active:bg-neutral-800">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-4 h-4">
+                  <polyline points="3 6 5 6 21 6"></polyline>
+                  <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                </svg>
+              </button>`
+            : '<span class="w-7 h-7"></span>'}
+        </span>
       `;
       modalList.appendChild(row);
     });
@@ -1485,6 +1875,14 @@
     listEl.addEventListener('focusout', onFocusOut);
     listEl.addEventListener('pointerdown', onDragPointerDown);
     listEl.addEventListener('keydown', onDragHandleKeydown);
+    listEl.addEventListener('pointerdown', onSwipePointerDown);
+    listEl.addEventListener('click', onSwipeActionClick);
+    // 開いたままのカードは、外側のどこかを触った時点で閉じる
+    document.addEventListener('pointerdown', (e) => {
+      if (!openSwipeCard) return;
+      const card = e.target instanceof Element ? e.target.closest('.distance-card') : null;
+      if (card !== openSwipeCard) closeSwipe(openSwipeCard);
+    });
     // アプリ切り替えなどでページが非表示になった場合、rAFが止まりドラッグが
     // 宙に浮いたままになるのを防ぐため、ドラッグ中なら強制的に確定させる
     document.addEventListener('visibilitychange', () => {
@@ -1505,6 +1903,7 @@
 
     initTheme();
 
+    buildToast();
     buildModal();
     editDistancesBtn.addEventListener('click', openModal);
 

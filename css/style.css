@@ -34,7 +34,7 @@ html.dark .pace-input:focus {
 /* Larger tap targets and no accidental text selection highlight on rapid taps */
 .pace-input {
   -webkit-tap-highlight-color: transparent;
-  touch-action: manipulation;
+  touch-action: pan-y;
 }
 
 /* Pace summary (min/sec) inputs share the same numeric-field treatment */
@@ -53,15 +53,48 @@ html.dark .pace-input:focus {
 
 /* Distance card subtle press feedback */
 .distance-card {
-  transition: border-color 120ms ease, background-color 120ms ease, box-shadow 120ms ease;
+  /* 縦スクロールはブラウザに任せ、横方向のジェスチャだけをJS側で受け取る */
+  touch-action: pan-y;
 }
-.distance-card:focus-within {
+.card-surface {
+  transition: border-color 120ms ease, background-color 120ms ease, box-shadow 120ms ease;
+  will-change: transform;
+}
+.distance-card:focus-within .card-surface {
   border-color: #65a30d; /* lime-600, light mode */
   box-shadow: 0 0 0 3px rgba(101, 163, 13, 0.15);
 }
-html.dark .distance-card:focus-within {
+html.dark .distance-card:focus-within .card-surface {
   border-color: #a3e635; /* lime-400, dark mode */
   box-shadow: 0 0 0 3px rgba(163, 230, 53, 0.15);
+}
+
+/* ピン留め中のカードは枠線だけ強めて、一覧のどこまでが固定枠か分かるようにする */
+.distance-card.is-pinned .card-surface {
+  border-color: rgba(101, 163, 13, 0.45);
+}
+html.dark .distance-card.is-pinned .card-surface {
+  border-color: rgba(163, 230, 53, 0.45);
+}
+
+/* 横スワイプで現れるアクション（右へ=ピン留め / 左へ=非表示） */
+.swipe-action {
+  opacity: 0;
+  transition: opacity 120ms ease;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: pan-y;
+}
+.distance-card.swipe-showing-pin .swipe-action[data-swipe-action='pin'],
+.distance-card.swipe-showing-hide .swipe-action[data-swipe-action='hide'] {
+  opacity: 1;
+}
+/* 「離せば実行」の距離まで引いたことを、色の濃さで手元に返す */
+.distance-card.swipe-armed .swipe-action {
+  filter: saturate(1.35) brightness(1.08);
+}
+body.swiping {
+  -webkit-user-select: none;
+  user-select: none;
 }
 
 /* Prevent background scroll while the distance-edit modal is open */

@@ -1841,7 +1841,7 @@
             class="text-3xl font-black bg-gradient-to-r from-lime-600 to-green-500 dark:from-lime-400 dark:to-green-300 bg-clip-text text-transparent">--</div>
           <p id="vdot-range-warning" class="hidden mt-1 mb-1 px-2.5 py-1.5 rounded-lg text-[10px] leading-relaxed text-amber-700 dark:text-amber-300 bg-amber-500/10 dark:bg-amber-400/10"></p>
           <button id="vdot-help-toggle" type="button" aria-expanded="false"
-            class="inline-flex items-center gap-1 text-[10px] text-neutral-400 dark:text-neutral-600 active:text-neutral-600 dark:active:text-neutral-300">
+            class="inline-flex items-center gap-1 -mx-3 px-3 py-3 rounded-lg text-[10px] text-neutral-400 dark:text-neutral-600 active:text-neutral-600 dark:active:text-neutral-300 active:bg-neutral-200/60 dark:active:bg-neutral-700/60">
             VDOTとは？
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-3 h-3">
               <circle cx="12" cy="12" r="9"></circle>
@@ -1870,7 +1870,7 @@
 
         <div class="rounded-xl bg-neutral-100/70 dark:bg-neutral-800/70 overflow-hidden">
           <button id="vdot-predict-toggle" type="button" aria-expanded="false"
-            class="w-full flex items-center gap-2 px-3 py-2 text-left">
+            class="w-full flex items-center gap-2 px-3.5 py-3.5 text-left">
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0 w-4 h-4 text-lime-600 dark:text-lime-400">
               <circle cx="12" cy="12" r="9"></circle>
               <polyline points="12 7 12 12 15 15"></polyline>
@@ -1884,7 +1884,7 @@
             <p class="text-[10px] text-neutral-500 dark:text-neutral-400 leading-relaxed mb-2">※これは持久力トレーニングを積んだ場合に発揮できる「ポテンシャル」の目安です。今すぐ出せるタイムを保証するものではありません。</p>
             <div id="vdot-predict-list" class="space-y-1"></div>
             <button id="vdot-predict-help-toggle" type="button" aria-expanded="false"
-              class="mt-2 inline-flex items-center gap-1 text-[10px] text-neutral-400 dark:text-neutral-600 active:text-neutral-600 dark:active:text-neutral-300">
+              class="mt-2 -mx-3 px-3 py-3 rounded-lg inline-flex items-center gap-1 text-[10px] text-neutral-400 dark:text-neutral-600 active:text-neutral-600 dark:active:text-neutral-300 active:bg-neutral-200/60 dark:active:bg-neutral-700/60">
               もっと詳しく
               <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-3 h-3">
                 <circle cx="12" cy="12" r="9"></circle>

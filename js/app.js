@@ -166,8 +166,12 @@
     const idx = visible.findIndex((d) => d.meters === meters);
     const targetIdx = idx + direction;
     if (idx === -1 || targetIdx < 0 || targetIdx >= visible.length) return;
-    // ピン留めブロックとの境界は越えさせない（越えても描画時に戻されるため）
-    if (visible[idx].pinned !== visible[targetIdx].pinned) return;
+    // ピン留めブロックとの境界は越えさせない（越えても描画時に戻されるため）。
+    // ドラッグと違って何も動いて見えないので、黙って無視せず理由を知らせる。
+    if (visible[idx].pinned !== visible[targetIdx].pinned) {
+      showToast('ピン留めの境界はまたげません');
+      return;
+    }
 
     const newOrder = visible.map((d) => d.meters);
     [newOrder[idx], newOrder[targetIdx]] = [newOrder[targetIdx], newOrder[idx]];
@@ -247,10 +251,44 @@
     return `${meters.toLocaleString('ja-JP')}m`;
   }
 
-  // 一覧の再描画は入力欄も作り直すため、ペースを描画後に必ず入れ直す
+  // 一覧の再描画は入力欄も作り直すため、ペースを描画後に必ず入れ直す。
+  // 別カードのスワイプ操作でこの再描画が走ると、いま入力中のカードの欄まで
+  // 巻き込んで消えてフォーカスも外れてしまうため、編集中の値とフォーカスは
+  // 描画後に元へ戻す（値は未確定の生の入力のまま、パディングせずに戻す）。
   function refreshCards() {
+    const active = document.activeElement;
+    let editing = null;
+    if (active && active.classList.contains('pace-input')) {
+      const card = active.closest('.distance-card');
+      if (card) {
+        editing = {
+          distance: active.dataset.distance,
+          unit: active.dataset.unit,
+          values: UNITS.map((u) => card.querySelector(`input[data-unit="${u}"]`).value),
+          selectionStart: active.selectionStart,
+          selectionEnd: active.selectionEnd,
+        };
+      }
+    }
+
     renderCards();
     applyPaceToAllVisible();
+
+    if (editing) {
+      const newCard = listEl.querySelector(`.distance-card[data-distance="${editing.distance}"]`);
+      if (newCard) {
+        UNITS.forEach((u, i) => {
+          newCard.querySelector(`input[data-unit="${u}"]`).value = editing.values[i];
+        });
+        const input = newCard.querySelector(`input[data-unit="${editing.unit}"]`);
+        if (input) {
+          input.focus();
+          try {
+            input.setSelectionRange(editing.selectionStart, editing.selectionEnd);
+          } catch (e) {}
+        }
+      }
+    }
   }
 
   function togglePinDistance(meters) {
@@ -340,6 +378,15 @@
   }
 
   function renderCards() {
+    // 別カードで横方向に確定済みの(＝指がまだ乗っている)スワイプが進行中のときに
+    // ここで作り直すと、そのカードのDOMごと消えて掴んでいる指の行き場がなくなり、
+    // ジェスチャが宙に浮いたまま壊れる。ジェスチャが終わるまで描画を遅らせ、
+    // detachSwipeListeners() 側で改めて描画する。
+    if (swipe.card && swipe.decided) {
+      pendingRenderCards = true;
+      return;
+    }
+
     const visible = visibleDistances();
     // 作り直すと開いていたスワイプのDOMごと消えるので、参照を先に手放す
     openSwipeCard = null;
@@ -365,7 +412,6 @@
         'distance-card relative overflow-hidden rounded-2xl shadow-lg shadow-lime-900/5 dark:shadow-black/30' +
         (pinned ? ' is-pinned' : '');
       card.dataset.distance = String(meters);
-      card.dataset.pinned = pinned ? '1' : '';
 
       card.appendChild(buildSwipeAction('pin', meters, pinned));
       card.appendChild(buildSwipeAction('hide', meters, pinned));
@@ -524,10 +570,18 @@
     });
   }
 
-  // 現在のペースを、表示中の全距離の欄に反映する（距離の追加・表示切替の直後に使用）
+  // 現在のペースを、表示中の全距離の欄に反映する（距離の追加・表示切替の直後に使用）。
+  // 他のカードで進行中の入力を巻き込んで上書きしないよう、いま編集中の欄の
+  // 距離だけは recalcFrom() と同じくスキップする。
   function applyPaceToAllVisible() {
     if (currentPace === null) return;
+    const active = document.activeElement;
+    const editingDistance =
+      active && active.classList && active.classList.contains('pace-input')
+        ? Number(active.dataset.distance)
+        : null;
     visibleDistances().forEach(({ meters }) => {
+      if (meters === editingDistance) return;
       const { hh, mm, ss, cs } = msToFields(currentPace * meters);
       setFieldValue(meters, 'hh', hh);
       setFieldValue(meters, 'mm', mm);
@@ -622,6 +676,7 @@
   let toastEl, toastMessageEl, toastActionBtn;
   let toastTimer = null;
   let toastAction = null;
+  const toastQueue = [];
 
   function buildToast() {
     toastEl = document.createElement('div');
@@ -652,10 +707,14 @@
     toastAction = null;
     toastEl.classList.add('hidden');
     toastEl.classList.remove('flex');
+    // 積んであった通知があれば続けて出す（取り消しを取りこぼさないため）
+    if (toastQueue.length) {
+      const next = toastQueue.shift();
+      presentToast(next.message, next.actionLabel, next.onAction);
+    }
   }
 
-  function showToast(message, actionLabel, onAction) {
-    if (toastTimer !== null) clearTimeout(toastTimer);
+  function presentToast(message, actionLabel, onAction) {
     toastMessageEl.textContent = message;
     toastAction = onAction || null;
     if (actionLabel && onAction) {
@@ -669,6 +728,16 @@
     toastTimer = setTimeout(hideToast, 6000);
   }
 
+  // 表示中のトーストがある間は上書きせず、キューに積んで順番に出す。
+  // （例: 連続で複数の距離を非表示にしても、それぞれの「元に戻す」を取りこぼさない）
+  function showToast(message, actionLabel, onAction) {
+    if (!toastEl.classList.contains('hidden')) {
+      toastQueue.push({ message, actionLabel, onAction });
+      return;
+    }
+    presentToast(message, actionLabel, onAction);
+  }
+
   // ---------- カードの横スワイプ（右=ピン留め / 左=非表示） ----------
   //
   // LINEのトーク一覧と同じ操作感。指の動きに合わせてカードの面(.card-surface)を
@@ -680,6 +749,9 @@
   const SWIPE_SETTLE_MS = 180;
 
   let openSwipeCard = null;
+  // 別カードのスワイプ中に描画がブロックされた場合に、ジェスチャ終了後
+  // detachSwipeListeners() から描画をやり直すためのフラグ
+  let pendingRenderCards = false;
   const swipe = {
     card: null,
     surface: null,
@@ -750,6 +822,13 @@
     swipe.surface = null;
     swipe.pointerId = null;
     document.body.classList.remove('swiping');
+
+    // このジェスチャに阻まれて後回しにしていた描画があれば、ここで改めて行う
+    if (pendingRenderCards) {
+      pendingRenderCards = false;
+      renderCards();
+      applyPaceToAllVisible();
+    }
   }
 
   function onSwipePointerDown(e) {
@@ -852,11 +931,20 @@
       hideDistance(meters);
       return;
     }
+    let done = false;
+    const finish = () => {
+      if (done) return;
+      done = true;
+      hideDistance(meters);
+    };
     card.dataset.swipeOffset = '0';
     surface.style.transition = `transform ${SWIPE_SETTLE_MS}ms ease, opacity ${SWIPE_SETTLE_MS}ms ease`;
     surface.style.transform = `translate3d(${-card.getBoundingClientRect().width}px, 0, 0)`;
     surface.style.opacity = '0';
-    setTimeout(() => hideDistance(meters), SWIPE_SETTLE_MS);
+    // タイマーではなく実際のアニメーション終了に合わせる(タイミングのズレを防ぐ)。
+    // transitionendが発火しない環境向けに、少し長めのタイマーも保険で入れておく。
+    surface.addEventListener('transitionend', finish, { once: true });
+    setTimeout(finish, SWIPE_SETTLE_MS + 100);
   }
 
   function onSwipeActionClick(e) {
@@ -901,6 +989,9 @@
 
   let dragCard = null;
   let dragPlaceholder = null;
+  // ドラッグ中に入れ替え先の候補となる、同じピン留めブロック内の他カード。
+  // ドラッグ中は増減しないため、毎フレーム作り直さずドラッグ開始時に一度だけ求める。
+  let dragGroup = [];
   let dragPointerId = null;
   let dragStartClientX = 0;
   let dragStartClientY = 0;
@@ -953,6 +1044,17 @@
     document.body.classList.add('dragging');
     document.body.appendChild(card);
 
+    // ピン留め中のカードは常に先頭ブロックにいるので、並び替えも同じブロック内に
+    // 限定する。そうしないと離した瞬間に描画順へ戻されて跳ねて見える。
+    // (キーボード操作の moveVisibleDistance() と同じく、モデル側の pinned を正とする)
+    const dragPinned = isPinned(Number(card.dataset.distance));
+    dragGroup = Array.from(listEl.children).filter(
+      (el) =>
+        el !== dragPlaceholder &&
+        el.classList.contains('distance-card') &&
+        isPinned(Number(el.dataset.distance)) === dragPinned
+    );
+
     try {
       handle.setPointerCapture(e.pointerId);
     } catch (err) {}
@@ -987,13 +1089,7 @@
     dragCard.style.transform = `translate3d(${dx}px, ${dy}px, 0) scale(1.03)`;
 
     const dragCenterY = dragStartTop + dy + dragCardHeight / 2;
-    const siblings = Array.from(listEl.children).filter(
-      (el) => el !== dragPlaceholder && el !== dragCard && el.classList.contains('distance-card')
-    );
-    // ピン留め中のカードは常に先頭ブロックにいるので、並び替えも同じブロック内に
-    // 限定する。そうしないと離した瞬間に描画順へ戻されて跳ねて見える。
-    const dragPinned = dragCard.dataset.pinned === '1';
-    const group = siblings.filter((el) => (el.dataset.pinned === '1') === dragPinned);
+    const group = dragGroup;
     if (!group.length) return;
 
     let target = null;
@@ -1106,6 +1202,7 @@
 
     dragCard = null;
     dragPlaceholder = null;
+    dragGroup = [];
     dragPointerId = null;
   }
 

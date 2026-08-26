@@ -1236,6 +1236,50 @@
     });
   }
 
+  // ---------- モーダル共通のフォーカス制御 ----------
+  //
+  // キーボード/スクリーンリーダー利用者向けに、開いたら閉じるボタン等へ
+  // フォーカスを移し、Tabキーがモーダルの外に出ないよう閉じ込め、閉じたら
+  // 開く前にフォーカスしていた要素へ戻す。
+
+  function getFocusableEls(panel) {
+    return Array.from(
+      panel.querySelectorAll(
+        'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
+      )
+    ).filter((el) => el.offsetParent !== null);
+  }
+
+  function trapFocusKeydown(panel, e) {
+    if (e.key !== 'Tab') return;
+    const focusables = getFocusableEls(panel);
+    if (!focusables.length) return;
+    const first = focusables[0];
+    const last = focusables[focusables.length - 1];
+    if (e.shiftKey && document.activeElement === first) {
+      e.preventDefault();
+      last.focus();
+    } else if (!e.shiftKey && document.activeElement === last) {
+      e.preventDefault();
+      first.focus();
+    }
+  }
+
+  let modalReturnFocusEl = null;
+
+  function focusModalOnOpen(panel, triggerEl, preferredEl) {
+    modalReturnFocusEl = triggerEl || document.activeElement;
+    const closeBtn = panel.querySelector('button[aria-label="閉じる"]');
+    (preferredEl || closeBtn || panel).focus();
+  }
+
+  function restoreFocusOnClose() {
+    if (modalReturnFocusEl && typeof modalReturnFocusEl.focus === 'function') {
+      modalReturnFocusEl.focus();
+    }
+    modalReturnFocusEl = null;
+  }
+
   // ---------- 距離編集モーダル ----------
 
   let modalOverlay, modalList, newDistanceInput, newDistanceError;
@@ -1246,9 +1290,9 @@
     modalOverlay.className =
       'fixed inset-0 z-50 hidden items-end sm:items-center justify-center bg-black/60 px-0 sm:px-4';
     modalOverlay.innerHTML = `
-      <div id="distance-modal-panel" class="w-full sm:max-w-sm sm:rounded-3xl rounded-t-3xl bg-white/95 dark:bg-neutral-900/95 backdrop-blur-sm border border-lime-600/10 dark:border-lime-400/10 shadow-2xl shadow-lime-900/10 dark:shadow-black/50 p-4 max-h-[80vh] flex flex-col">
+      <div id="distance-modal-panel" role="dialog" aria-modal="true" aria-labelledby="distance-modal-title" tabindex="-1" class="w-full sm:max-w-sm sm:rounded-3xl rounded-t-3xl bg-white/95 dark:bg-neutral-900/95 backdrop-blur-sm border border-lime-600/10 dark:border-lime-400/10 shadow-2xl shadow-lime-900/10 dark:shadow-black/50 p-4 max-h-[80vh] flex flex-col outline-none">
         <div class="flex items-center justify-between mb-3">
-          <h2 class="text-base font-bold text-neutral-900 dark:text-white">距離を編集</h2>
+          <h2 id="distance-modal-title" class="text-base font-bold text-neutral-900 dark:text-white">距離を編集</h2>
           <button id="distance-modal-close" type="button" aria-label="閉じる"
             class="w-8 h-8 flex items-center justify-center rounded-full text-neutral-500 dark:text-neutral-400 active:bg-neutral-100 dark:active:bg-neutral-800">
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-5 h-5">
@@ -1284,7 +1328,12 @@
       if (e.target === modalOverlay) closeModal();
     });
     document.addEventListener('keydown', (e) => {
-      if (e.key === 'Escape' && !modalOverlay.classList.contains('hidden')) closeModal();
+      if (modalOverlay.classList.contains('hidden')) return;
+      if (e.key === 'Escape') {
+        closeModal();
+        return;
+      }
+      trapFocusKeydown(modalOverlay.querySelector('#distance-modal-panel'), e);
     });
 
     modalOverlay.querySelector('#add-distance-btn').addEventListener('click', handleAddDistance);
@@ -1383,12 +1432,14 @@
     document.body.classList.add('modal-open');
     newDistanceInput.value = '';
     newDistanceError.classList.add('hidden');
+    focusModalOnOpen(modalOverlay.querySelector('#distance-modal-panel'), editDistancesBtn);
   }
 
   function closeModal() {
     modalOverlay.classList.add('hidden');
     modalOverlay.classList.remove('flex');
     document.body.classList.remove('modal-open');
+    restoreFocusOnClose();
   }
 
   // ---------- VDOT / トレーニングペース ----------
@@ -1432,6 +1483,11 @@
   ];
   const VDOT_GAUGE_MIN = 20;
   const VDOT_GAUGE_MAX = 75;
+  // 計算式が実測値と一致することを確認済みの範囲（1500m〜フルマラソン）。
+  // 「その他」で範囲外の距離を入力すると数式は動くが、レベル判定などの結果は
+  // 大きく外れうるため、そのまま鵜呑みにされないよう警告を出す
+  const VDOT_VALID_MIN_METERS = 1500;
+  const VDOT_VALID_MAX_METERS = 42195;
 
   function getVdotLevel(vdot) {
     return VDOT_LEVELS.find((l) => vdot < l.max) || VDOT_LEVELS[VDOT_LEVELS.length - 1];
@@ -1571,6 +1627,7 @@
     vdotSsInput,
     vdotCsInput,
     vdotResultEl,
+    vdotRangeWarningEl,
     vdotHelpToggle,
     vdotHelpText,
     vdotLevelLabelEl,
@@ -1604,10 +1661,18 @@
     return (hh * 3600 + mm * 60 + ss) * 1000 + cs * 10;
   }
 
-  function updateVdotLevel(vdot) {
+  function updateVdotLevel(vdot, outOfRange) {
     if (vdot === null) {
       vdotLevelLabelEl.textContent = '--';
       vdotLevelDescEl.textContent = '距離とタイムを入力すると目安が表示されます';
+      vdotLevelFillEl.style.width = '0%';
+      return;
+    }
+    if (outOfRange) {
+      // 有効範囲外では「エリート」等の断定的なレベル判定を出さない
+      // (100mを全力の秒数で入力すると計算上VDOTが跳ね上がるなど、誤解を招くため)
+      vdotLevelLabelEl.textContent = '判定対象外';
+      vdotLevelDescEl.textContent = '有効範囲外の距離のため、レベルの目安は表示できません';
       vdotLevelFillEl.style.width = '0%';
       return;
     }
@@ -1639,18 +1704,26 @@
 
     if (!meters || totalMs <= 0) {
       vdotResultEl.textContent = '--';
+      vdotRangeWarningEl.classList.add('hidden');
       zonePaceEls.forEach((el) => { el.textContent = '--\'--"'; });
       updateVdotLevel(null);
       updateVdotPredictions(null);
       return;
     }
 
+    const outOfRange = meters < VDOT_VALID_MIN_METERS || meters > VDOT_VALID_MAX_METERS;
+    if (outOfRange) {
+      vdotRangeWarningEl.textContent =
+        `距離が有効範囲(${VDOT_VALID_MIN_METERS.toLocaleString('ja-JP')}m〜フルマラソン)外です。計算結果は参考程度に見てください。`;
+    }
+    vdotRangeWarningEl.classList.toggle('hidden', !outOfRange);
+
     const vdot = vdotFromPerformance(meters, totalMs / 1000);
     vdotResultEl.textContent = vdot.toFixed(1);
     TRAINING_ZONES.forEach((z, i) => {
       zonePaceEls[i].textContent = formatPaceSecPerKm(trainingPaceSecPerKm(vdot, z.pct));
     });
-    updateVdotLevel(vdot);
+    updateVdotLevel(vdot, outOfRange);
     updateVdotPredictions(vdot);
     saveVdotRace(meters, totalMs);
   }
@@ -1716,9 +1789,9 @@
     vdotModalOverlay.className =
       'fixed inset-0 z-50 hidden items-end sm:items-center justify-center bg-black/60 px-0 sm:px-4';
     vdotModalOverlay.innerHTML = `
-      <div id="vdot-modal-panel" class="w-full sm:max-w-sm sm:rounded-3xl rounded-t-3xl bg-white/95 dark:bg-neutral-900/95 backdrop-blur-sm border border-lime-600/10 dark:border-lime-400/10 shadow-2xl shadow-lime-900/10 dark:shadow-black/50 p-4 max-h-[85vh] overflow-y-auto">
+      <div id="vdot-modal-panel" role="dialog" aria-modal="true" aria-labelledby="vdot-modal-title" tabindex="-1" class="w-full sm:max-w-sm sm:rounded-3xl rounded-t-3xl bg-white/95 dark:bg-neutral-900/95 backdrop-blur-sm border border-lime-600/10 dark:border-lime-400/10 shadow-2xl shadow-lime-900/10 dark:shadow-black/50 p-4 max-h-[85vh] overflow-y-auto outline-none">
         <div class="flex items-center justify-between mb-3">
-          <h2 class="text-base font-bold text-neutral-900 dark:text-white">VDOTトレーニングペース</h2>
+          <h2 id="vdot-modal-title" class="text-base font-bold text-neutral-900 dark:text-white">VDOTトレーニングペース</h2>
           <button id="vdot-modal-close" type="button" aria-label="閉じる"
             class="w-8 h-8 flex items-center justify-center rounded-full text-neutral-500 dark:text-neutral-400 active:bg-neutral-100 dark:active:bg-neutral-800">
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-5 h-5">
@@ -1764,7 +1837,9 @@
         </div>
 
         <div class="text-center mb-1">
-          <div id="vdot-result-value" class="text-3xl font-black bg-gradient-to-r from-lime-600 to-green-500 dark:from-lime-400 dark:to-green-300 bg-clip-text text-transparent">--</div>
+          <div id="vdot-result-value" aria-live="polite"
+            class="text-3xl font-black bg-gradient-to-r from-lime-600 to-green-500 dark:from-lime-400 dark:to-green-300 bg-clip-text text-transparent">--</div>
+          <p id="vdot-range-warning" class="hidden mt-1 mb-1 px-2.5 py-1.5 rounded-lg text-[10px] leading-relaxed text-amber-700 dark:text-amber-300 bg-amber-500/10 dark:bg-amber-400/10"></p>
           <button id="vdot-help-toggle" type="button" aria-expanded="false"
             class="inline-flex items-center gap-1 text-[10px] text-neutral-400 dark:text-neutral-600 active:text-neutral-600 dark:active:text-neutral-300">
             VDOTとは？
@@ -1779,7 +1854,7 @@
           </p>
         </div>
 
-        <div class="mb-3">
+        <div class="mb-3" aria-live="polite">
           <div id="vdot-level-label" class="text-center text-xs font-bold text-lime-700 dark:text-lime-300 mb-0.5">--</div>
           <div id="vdot-level-desc" class="text-center text-[10px] text-neutral-400 dark:text-neutral-600 mb-1.5 leading-relaxed">距離とタイムを入力すると目安が表示されます</div>
           <div class="h-2 rounded-full bg-neutral-200 dark:bg-neutral-800">
@@ -1835,6 +1910,7 @@
     vdotSsInput = vdotModalOverlay.querySelector('#vdot-ss-input');
     vdotCsInput = vdotModalOverlay.querySelector('#vdot-cs-input');
     vdotResultEl = vdotModalOverlay.querySelector('#vdot-result-value');
+    vdotRangeWarningEl = vdotModalOverlay.querySelector('#vdot-range-warning');
     vdotHelpToggle = vdotModalOverlay.querySelector('#vdot-help-toggle');
     vdotHelpText = vdotModalOverlay.querySelector('#vdot-help-text');
     vdotLevelLabelEl = vdotModalOverlay.querySelector('#vdot-level-label');
@@ -1913,7 +1989,12 @@
       if (e.target === vdotModalOverlay) closeVdotModal();
     });
     document.addEventListener('keydown', (e) => {
-      if (e.key === 'Escape' && !vdotModalOverlay.classList.contains('hidden')) closeVdotModal();
+      if (vdotModalOverlay.classList.contains('hidden')) return;
+      if (e.key === 'Escape') {
+        closeVdotModal();
+        return;
+      }
+      trapFocusKeydown(vdotModalOverlay.querySelector('#vdot-modal-panel'), e);
     });
 
     vdotDistanceSelect.addEventListener('change', onVdotDistanceChange);
@@ -1953,12 +2034,17 @@
     vdotModalOverlay.classList.remove('hidden');
     vdotModalOverlay.classList.add('flex');
     document.body.classList.add('modal-open');
+    // 距離が決まっている(前回の保存あり)ならタイム欄から、まだなら距離欄から
+    // 入力を始められるようにする(タップ回数を減らすため)
+    const firstFieldToFocus = saved ? vdotMmInput : vdotDistanceSelect;
+    focusModalOnOpen(vdotModalOverlay.querySelector('#vdot-modal-panel'), vdotBtn, firstFieldToFocus);
   }
 
   function closeVdotModal() {
     vdotModalOverlay.classList.add('hidden');
     vdotModalOverlay.classList.remove('flex');
     document.body.classList.remove('modal-open');
+    restoreFocusOnClose();
   }
 
   // ---------- 初期化 ----------

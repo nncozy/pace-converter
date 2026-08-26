@@ -8,6 +8,160 @@ body {
   font-feature-settings: "tnum" 1;
 }
 
+/* 桁の出し分けや初回案内の開閉は hidden 属性でやっているが、Tailwindの
+   display系ユーティリティ(.flex など)は preflight の [hidden] より後に
+   定義されるため、同じ詳細度で後勝ちして畳めなくなる。明示的に勝たせる。 */
+[hidden] {
+  display: none !important;
+}
+
+/* ---------- ボタンの3階層 ----------
+   同じ見た目のボタンが並ぶと、どれが本命なのかを毎回読んで判断させることになる。
+   primary(実行) / secondary(任意の機能) / ghost(補助・取り消し) の3段だけを用意し、
+   画面のどこでもこの3つから選ぶ。 */
+
+.btn-primary,
+.btn-secondary,
+.btn-ghost {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.375rem;
+  border-radius: 9999px;
+  font-weight: 700;
+  white-space: nowrap;
+  -webkit-tap-highlight-color: transparent;
+  transition: transform 120ms ease, background-color 120ms ease, box-shadow 120ms ease,
+    color 120ms ease, border-color 120ms ease;
+}
+.btn-primary:active,
+.btn-secondary:active,
+.btn-ghost:active,
+.icon-btn:active {
+  transform: scale(0.96);
+}
+
+.btn-primary {
+  padding: 0.625rem 1.25rem;
+  font-size: 0.875rem;
+  color: #fff;
+  background-image: linear-gradient(to right, #65a30d, #22c55e);
+  box-shadow: 0 6px 16px -4px rgba(101, 163, 13, 0.45);
+}
+html.dark .btn-primary {
+  color: #0a0a0a;
+  background-image: linear-gradient(to right, #a3e635, #86efac);
+  box-shadow: 0 6px 16px -4px rgba(163, 230, 53, 0.3);
+}
+
+.btn-secondary {
+  padding: 0.5rem 1rem;
+  font-size: 0.8125rem;
+  color: #404040;
+  background: rgba(255, 255, 255, 0.85);
+  border: 1px solid rgba(101, 163, 13, 0.25);
+  box-shadow: 0 2px 8px -2px rgba(101, 163, 13, 0.12);
+  backdrop-filter: blur(4px);
+}
+html.dark .btn-secondary {
+  color: #d4d4d4;
+  background: rgba(23, 23, 23, 0.85);
+  border-color: rgba(163, 230, 53, 0.22);
+  box-shadow: 0 2px 8px -2px rgba(0, 0, 0, 0.5);
+}
+
+.btn-ghost {
+  padding: 0.4375rem 0.875rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #737373;
+  background: transparent;
+  border: 1px solid transparent;
+}
+.btn-ghost:active {
+  background: rgba(0, 0, 0, 0.05);
+}
+html.dark .btn-ghost {
+  color: #a3a3a3;
+}
+html.dark .btn-ghost:active {
+  background: rgba(255, 255, 255, 0.07);
+}
+
+/* ヘッダーの丸アイコンボタン。44pxの推奨タップ領域を、見た目36pxのまま確保する */
+.icon-btn {
+  position: relative;
+  width: 2.25rem;
+  height: 2.25rem;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 9999px;
+  color: #525252;
+  background: rgba(255, 255, 255, 0.8);
+  border: 1px solid rgba(101, 163, 13, 0.15);
+  box-shadow: 0 2px 6px -2px rgba(101, 163, 13, 0.15);
+  -webkit-tap-highlight-color: transparent;
+  transition: transform 120ms ease, background-color 120ms ease;
+}
+html.dark .icon-btn {
+  color: #d4d4d4;
+  background: rgba(23, 23, 23, 0.8);
+  border-color: rgba(163, 230, 53, 0.15);
+  box-shadow: 0 2px 6px -2px rgba(0, 0, 0, 0.6);
+}
+.icon-btn::after {
+  content: "";
+  position: absolute;
+  inset: -4px;
+}
+
+/* 初回案内のバッジ */
+.info-chip {
+  border-radius: 9999px;
+  border: 1px solid rgba(101, 163, 13, 0.2);
+  background: rgba(255, 255, 255, 0.7);
+  padding: 0.25rem 0.625rem;
+  font-size: 10px;
+  font-weight: 600;
+  color: #4d7c0f;
+}
+html.dark .info-chip {
+  border-color: rgba(163, 230, 53, 0.2);
+  background: rgba(23, 23, 23, 0.7);
+  color: #bef264;
+}
+
+/* ペースから機械的に決まる値（1周・1マイル・時速）。読み取り専用なので枠は最小限 */
+.derived-chip {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.25rem;
+  border-radius: 9999px;
+  border: 1px solid rgba(101, 163, 13, 0.15);
+  background: rgba(255, 255, 255, 0.6);
+  padding: 0.1875rem 0.625rem;
+  font-size: 11px;
+  color: #525252;
+}
+html.dark .derived-chip {
+  border-color: rgba(163, 230, 53, 0.15);
+  background: rgba(23, 23, 23, 0.6);
+  color: #a3a3a3;
+}
+.derived-chip b {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+  color: #4d7c0f;
+}
+html.dark .derived-chip b {
+  color: #bef264;
+}
+
+/* ---------- ペースのヒーロー入力 ---------- */
+
 /* Remove number input spinners for a cleaner, running-watch-like look */
 .pace-input::-webkit-outer-spin-button,
 .pace-input::-webkit-inner-spin-button {
@@ -49,7 +203,35 @@ html.dark .pace-input:focus {
   -webkit-tap-highlight-color: transparent;
   touch-action: manipulation;
   caret-color: currentColor;
+  /* グラデーション面の上に、押せる「窪み」として置く。ただの表示ではなく
+     入力欄だと分かるようにするのが目的なので、枠ではなく面の差で示す */
+  color: #fff;
+  background: rgba(255, 255, 255, 0.14);
+  border: none;
+  border-radius: 0.625rem;
+  /* 44px前後のタップ領域を確保する（text-3xlの行高36pxだけでは足りない） */
+  padding: 0.25rem 0.375rem;
+  outline: none;
+  transition: background-color 120ms ease;
 }
+.pace-summary-input::placeholder {
+  color: rgba(255, 255, 255, 0.6);
+}
+.pace-summary-input:focus {
+  background: rgba(255, 255, 255, 0.3);
+}
+html.dark .pace-summary-input {
+  color: #0a0a0a;
+  background: rgba(10, 10, 10, 0.1);
+}
+html.dark .pace-summary-input::placeholder {
+  color: rgba(10, 10, 10, 0.45);
+}
+html.dark .pace-summary-input:focus {
+  background: rgba(10, 10, 10, 0.2);
+}
+
+/* ---------- 距離カード ---------- */
 
 /* Distance card subtle press feedback */
 .distance-card {
@@ -77,6 +259,56 @@ html.dark .distance-card.is-pinned .card-surface {
   border-color: rgba(163, 230, 53, 0.45);
 }
 
+/* 「いま自分が打った値はどれか」を画面に残す。これが無いと、入力後は
+   9枚すべてが同じ顔になり、どれが入力でどれが計算結果か分からなくなる。 */
+.distance-card.is-source .card-surface {
+  border-color: #65a30d;
+  box-shadow: 0 0 0 2px rgba(101, 163, 13, 0.18);
+}
+html.dark .distance-card.is-source .card-surface {
+  border-color: #a3e635;
+  box-shadow: 0 0 0 2px rgba(163, 230, 53, 0.18);
+}
+.source-badge {
+  display: none;
+}
+.distance-card.is-source .source-badge {
+  display: inline-flex;
+}
+
+/* 計算結果として書き換わった瞬間だけ光らせる。数字が黙って差し替わるだけだと
+   「他の距離も連動している」という、このアプリ唯一の売りが体感できない。 */
+@keyframes value-flash {
+  0% {
+    background-color: rgba(101, 163, 13, 0.22);
+  }
+  100% {
+    background-color: inherit;
+  }
+}
+.pace-input.is-flashing {
+  animation: value-flash 420ms ease-out;
+}
+html.dark .pace-input.is-flashing {
+  animation-name: value-flash-dark;
+}
+@keyframes value-flash-dark {
+  0% {
+    background-color: rgba(163, 230, 53, 0.18);
+  }
+  100% {
+    background-color: inherit;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .pace-input.is-flashing {
+    animation: none;
+  }
+  .animate-fade-in-up {
+    animation: none;
+  }
+}
+
 /* 横スワイプで現れるアクション（右へ=ピン留め / 左へ=非表示） */
 .swipe-action {
   opacity: 0;
@@ -100,6 +332,44 @@ body.swiping {
 /* Prevent background scroll while the distance-edit modal is open */
 body.modal-open {
   overflow: hidden;
+}
+
+/* ---------- モーダル ---------- */
+
+/* よく使う距離のワンタップ追加チップ。押すと「入っている／入っていない」が
+   その場で切り替わるので、追加できたかを確かめに一覧を見に行かなくて済む */
+.preset-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  border-radius: 9999px;
+  border: 1px solid rgba(101, 163, 13, 0.25);
+  background: #fff;
+  padding: 0.375rem 0.75rem;
+  font-size: 12px;
+  font-weight: 600;
+  color: #404040;
+  -webkit-tap-highlight-color: transparent;
+  transition: transform 120ms ease, background-color 120ms ease, color 120ms ease,
+    border-color 120ms ease;
+}
+.preset-chip:active {
+  transform: scale(0.95);
+}
+html.dark .preset-chip {
+  background: #171717;
+  border-color: rgba(163, 230, 53, 0.22);
+  color: #d4d4d4;
+}
+.preset-chip[aria-pressed='true'] {
+  background: #ecfccb;
+  border-color: #65a30d;
+  color: #3f6212;
+}
+html.dark .preset-chip[aria-pressed='true'] {
+  background: #1a2e05;
+  border-color: #a3e635;
+  color: #bef264;
 }
 
 /* VDOT modal time-input fields share the pace-input numeric-field treatment */

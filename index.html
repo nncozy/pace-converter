@@ -49,14 +49,18 @@
     } catch (e) {}
   })();
 </script>
-<link rel="stylesheet" href="css/style.css?v=13">
+<link rel="stylesheet" href="css/style.css?v=18">
 </head>
 <body class="bg-[#f7faf2] dark:bg-[#0a0e08] text-neutral-900 dark:text-white min-h-screen antialiased transition-colors">
-  <div class="max-w-md mx-auto px-4 pt-6 pb-16 animate-fade-in-up">
-    <header class="mb-5">
-      <div class="flex items-center justify-between gap-2 mb-4">
+  <div class="max-w-md mx-auto px-4 pb-16 animate-fade-in-up">
+
+    <!-- スクロールしても「編集」「テーマ」「いまの基準ペース」に手が届くよう常に上に留める。
+         一覧が長くなるほど、下まで見てから戻る操作が要らない効果が効いてくる。 -->
+    <header id="app-header"
+      class="sticky top-0 z-30 -mx-4 px-4 pt-[max(0.5rem,env(safe-area-inset-top))] pb-2 bg-[#f7faf2]/85 dark:bg-[#0a0e08]/85 backdrop-blur-md border-b border-lime-600/10 dark:border-lime-400/10">
+      <div class="flex items-center justify-between gap-2">
         <button id="edit-distances-btn" type="button" aria-label="距離を編集"
-          class="w-9 h-9 shrink-0 flex items-center justify-center rounded-full bg-white/80 dark:bg-neutral-900/80 backdrop-blur-sm border border-lime-600/15 dark:border-lime-400/15 text-neutral-600 dark:text-neutral-300 shadow-sm shadow-lime-900/5 dark:shadow-black/40 hover:-translate-y-0.5 active:translate-y-0 active:scale-95 transition">
+          class="icon-btn">
           <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-5 h-5">
             <line x1="4" y1="6" x2="20" y2="6"></line>
             <line x1="4" y1="12" x2="20" y2="12"></line>
@@ -67,68 +71,120 @@
           </svg>
         </button>
 
-        <h1 class="text-2xl font-black tracking-tight text-center flex-1 truncate bg-gradient-to-r from-lime-600 to-green-500 dark:from-lime-400 dark:to-green-300 bg-clip-text text-transparent">
-          PACE CONVERTER
-        </h1>
+        <div class="flex-1 min-w-0 text-center">
+          <h1 id="app-title" class="text-lg font-black tracking-tight truncate bg-gradient-to-r from-lime-600 to-green-500 dark:from-lime-400 dark:to-green-300 bg-clip-text text-transparent">
+            PACE CONVERTER
+          </h1>
+          <!-- ヒーローのペース欄が画面外へ出たときだけ、ここに基準ペースを差し替えて出す -->
+          <button id="header-pace" type="button" hidden
+            class="mx-auto items-baseline gap-0.5 rounded-full bg-gradient-to-r from-lime-600 to-green-500 dark:from-lime-400 dark:to-green-300 px-3 py-1 text-white dark:text-neutral-950 shadow-sm">
+            <span class="header-pace-value font-mono font-black text-sm tabular-nums"></span>
+            <span class="text-[10px] font-bold opacity-80">/ km</span>
+          </button>
+        </div>
 
-        <button id="theme-toggle-btn" type="button" aria-label="テーマを切り替え"
-          class="w-9 h-9 shrink-0 flex items-center justify-center rounded-full bg-white/80 dark:bg-neutral-900/80 backdrop-blur-sm border border-lime-600/15 dark:border-lime-400/15 text-neutral-600 dark:text-neutral-300 shadow-sm shadow-lime-900/5 dark:shadow-black/40 hover:-translate-y-0.5 active:translate-y-0 active:scale-95 transition"></button>
-      </div>
-      <p class="text-xs text-center text-neutral-500 dark:text-neutral-400 leading-relaxed">
-        いずれかの距離のタイムを入力すると、<br>同じペースの他の距離のタイムが自動計算されます
-      </p>
-      <div class="flex flex-wrap justify-center gap-1.5 mt-3">
-        <span class="rounded-full border border-lime-600/20 dark:border-lime-400/20 bg-white/70 dark:bg-neutral-900/70 backdrop-blur-sm px-2.5 py-1 text-[10px] font-semibold text-lime-700 dark:text-lime-300 shadow-sm shadow-lime-900/5">🔓 ログイン不要</span>
-        <span class="rounded-full border border-lime-600/20 dark:border-lime-400/20 bg-white/70 dark:bg-neutral-900/70 backdrop-blur-sm px-2.5 py-1 text-[10px] font-semibold text-lime-700 dark:text-lime-300 shadow-sm shadow-lime-900/5">📱 ホーム画面に追加OK</span>
-        <span class="rounded-full border border-lime-600/20 dark:border-lime-400/20 bg-white/70 dark:bg-neutral-900/70 backdrop-blur-sm px-2.5 py-1 text-[10px] font-semibold text-lime-700 dark:text-lime-300 shadow-sm shadow-lime-900/5">⚡ 瞬時に自動計算</span>
+        <button id="theme-toggle-btn" type="button" aria-label="テーマを切り替え" class="icon-btn"></button>
       </div>
     </header>
 
-    <div class="mb-2 text-center">
-      <div class="inline-flex items-baseline gap-1 rounded-2xl bg-gradient-to-r from-lime-600 to-green-500 dark:from-lime-400 dark:to-green-300 pl-4 pr-3 py-2 shadow-md shadow-lime-600/30 dark:shadow-lime-400/20">
-        <input id="pace-min-input" type="number" inputmode="numeric" pattern="[0-9]*" min="0" max="999" placeholder="--"
-          aria-label="1kmあたりの分"
-          class="pace-summary-input w-10 bg-transparent text-white dark:text-neutral-950 text-2xl font-black font-mono tabular-nums text-right focus:outline-none placeholder:text-white/70 dark:placeholder:text-neutral-950/50">
-        <span class="text-white dark:text-neutral-950 text-2xl font-black">'</span>
-        <input id="pace-sec-input" type="number" inputmode="numeric" pattern="[0-9]*" min="0" max="59" placeholder="--"
-          aria-label="1kmあたりの秒"
-          class="pace-summary-input w-9 bg-transparent text-white dark:text-neutral-950 text-2xl font-black font-mono tabular-nums focus:outline-none placeholder:text-white/70 dark:placeholder:text-neutral-950/50">
-        <span class="text-white dark:text-neutral-950 text-2xl font-black">"</span>
-        <span class="text-white/85 dark:text-neutral-950/70 text-xs font-bold ml-1 self-center">/ km</span>
+    <!-- 初回だけの案内。毎日使う人には不要なので、一度ペースを入れたら以後は出ない。 -->
+    <section id="intro" hidden class="relative mt-3 rounded-2xl border border-lime-600/20 dark:border-lime-400/20 bg-white/70 dark:bg-neutral-900/70 backdrop-blur-sm px-4 py-3">
+      <button id="intro-dismiss" type="button" aria-label="この案内を閉じる"
+        class="absolute top-1.5 right-1.5 w-7 h-7 flex items-center justify-center rounded-full text-neutral-400 dark:text-neutral-600 active:bg-neutral-100 dark:active:bg-neutral-800">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" class="w-4 h-4">
+          <line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line>
+        </svg>
+      </button>
+      <p class="text-xs text-center text-neutral-600 dark:text-neutral-300 leading-relaxed pr-5">
+        いずれかの距離のタイムを入力すると、<br>同じペースの他の距離のタイムが自動計算されます
+      </p>
+      <div class="flex flex-wrap justify-center gap-1.5 mt-2.5">
+        <span class="info-chip">🔓 ログイン不要</span>
+        <span class="info-chip">📱 ホーム画面に追加OK</span>
+        <span class="info-chip">⚡ 瞬時に自動計算</span>
       </div>
-      <p class="text-[10px] text-neutral-400 dark:text-neutral-600 mt-1">ここに直接ペースを入力してもOK</p>
-    </div>
+    </section>
 
-    <div class="mb-4 flex flex-col items-center gap-1">
-      <button id="vdot-btn" type="button"
-        class="inline-flex items-center gap-1.5 px-4 py-2 rounded-full bg-white/80 dark:bg-neutral-900/80 backdrop-blur-sm border border-lime-600/15 dark:border-lime-400/15 text-neutral-600 dark:text-neutral-300 text-xs font-semibold shadow-sm shadow-lime-900/5 dark:shadow-black/40 hover:-translate-y-0.5 active:translate-y-0 active:scale-95 transition">
+    <!-- 主役。ここが「読むところ」ではなく「打てるところ」だと一目で分かるよう、
+         入力欄そのものに凹んだ面と点線の下線を持たせている。 -->
+    <section id="pace-hero" class="mt-4 mb-3 text-center">
+      <div class="pace-hero-card inline-flex flex-col items-center gap-1 rounded-3xl bg-gradient-to-br from-lime-600 to-green-500 dark:from-lime-400 dark:to-green-300 px-5 pt-2.5 pb-2 shadow-lg shadow-lime-600/25 dark:shadow-lime-400/15">
+        <span class="text-[10px] font-black tracking-widest text-white/80 dark:text-neutral-950/60 uppercase">Pace</span>
+        <div class="flex items-baseline gap-1">
+          <input id="pace-min-input" type="number" inputmode="numeric" pattern="[0-9]*" min="0" max="999" placeholder="--"
+            aria-label="1kmあたりの分"
+            class="pace-summary-input w-[3.1rem] text-3xl font-black font-mono tabular-nums text-right">
+          <span class="text-white dark:text-neutral-950 text-3xl font-black leading-none">'</span>
+          <input id="pace-sec-input" type="number" inputmode="numeric" pattern="[0-9]*" min="0" max="59" placeholder="--"
+            aria-label="1kmあたりの秒"
+            class="pace-summary-input w-[2.9rem] text-3xl font-black font-mono tabular-nums">
+          <span class="text-white dark:text-neutral-950 text-3xl font-black leading-none">"</span>
+          <span class="text-white/85 dark:text-neutral-950/70 text-xs font-bold ml-1 self-center">/ km</span>
+        </div>
+        <span class="text-[10px] font-semibold text-white/75 dark:text-neutral-950/60">タップして直接入力できます</span>
+      </div>
+
+      <!-- ペースが決まったときだけ出る派生値。ランナーが頭の中でやる換算を先回りする。 -->
+      <div id="pace-derived" hidden class="mt-2 flex flex-wrap justify-center gap-1.5"></div>
+    </section>
+
+    <div class="mb-4 flex items-center justify-center gap-2">
+      <button id="vdot-btn" type="button" class="btn-secondary">
         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-4 h-4">
           <circle cx="12" cy="12" r="9"></circle>
           <circle cx="12" cy="12" r="4"></circle>
           <circle cx="12" cy="12" r="0.5" fill="currentColor"></circle>
         </svg>
-        トレーニングペースを計算
+        トレーニングペース
       </button>
-      <p class="text-[10px] text-neutral-400 dark:text-neutral-600">お試し機能・使わなくてもOK</p>
-    </div>
-
-    <div id="distance-list" class="space-y-3"></div>
-
-    <div class="mt-6 flex justify-center">
-      <button id="reset-btn" type="button"
-        class="px-5 py-2.5 rounded-full bg-white/80 dark:bg-neutral-900/80 backdrop-blur-sm border border-lime-600/15 dark:border-lime-400/15 text-neutral-600 dark:text-neutral-300 text-sm font-semibold shadow-sm shadow-lime-900/5 dark:shadow-black/40 hover:-translate-y-0.5 active:translate-y-0 active:bg-neutral-100 dark:active:bg-neutral-800 active:scale-95 transition">
-        入力をリセット
+      <!-- 消す操作は、消すものが画面にあるときだけ出す -->
+      <button id="reset-btn" type="button" hidden class="btn-ghost">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-4 h-4">
+          <path d="M3 2v6h6"></path>
+          <path d="M3.51 15a9 9 0 1 0 2.13-9.36L3 8"></path>
+        </svg>
+        クリア
       </button>
     </div>
 
-    <footer class="mt-8 text-center text-[11px] leading-relaxed text-neutral-400 dark:text-neutral-600">
-      <p>hh : mm : ss . ミリ秒（2桁）の形式で入力してください。</p>
-      <p>2桁入力すると自動的に次の欄へ移動します。</p>
-      <p class="mt-1.5">距離カードを右へスワイプでピン留め（先頭に固定）、左へスワイプで非表示にできます。</p>
+    <!-- スワイプ操作は画面上に痕跡がないので、初回だけここで名指しする -->
+    <div id="swipe-coach" hidden class="mb-3 flex items-start gap-2 rounded-xl border border-dashed border-lime-600/30 dark:border-lime-400/25 px-3 py-2 text-[11px] leading-relaxed text-neutral-500 dark:text-neutral-400">
+      <span class="shrink-0 pt-px">💡</span>
+      <span class="flex-1">カードを<b class="font-bold text-neutral-700 dark:text-neutral-200">右スワイプでピン留め</b>／<b class="font-bold text-neutral-700 dark:text-neutral-200">左スワイプで非表示</b></span>
+      <button id="swipe-coach-dismiss" type="button" aria-label="ヒントを閉じる"
+        class="shrink-0 -mt-0.5 -mr-1 w-6 h-6 flex items-center justify-center rounded-full text-neutral-400 dark:text-neutral-600 active:bg-neutral-100 dark:active:bg-neutral-800">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" class="w-3.5 h-3.5">
+          <line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line>
+        </svg>
+      </button>
+    </div>
+
+    <div id="distance-list" class="space-y-2.5"></div>
+
+    <div class="mt-5 flex justify-center">
+      <button id="add-distance-shortcut" type="button" class="btn-ghost">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-4 h-4">
+          <line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line>
+        </svg>
+        距離を追加・編集
+      </button>
+    </div>
+
+    <footer class="mt-8 text-[11px] leading-relaxed text-neutral-400 dark:text-neutral-600">
+      <details class="rounded-xl border border-lime-600/10 dark:border-lime-400/10 px-3 py-2">
+        <summary class="cursor-pointer font-semibold text-neutral-500 dark:text-neutral-400 select-none">使い方・入力のルール</summary>
+        <ul class="mt-2 space-y-1 list-disc pl-4">
+          <li>入力欄は距離に合わせて出し分けています（短い距離は <b>分:秒.ms</b>、長い距離は <b>時:分:秒</b>）。必要な桁は自動で現れます。</li>
+          <li>2桁入力すると自動的に次の欄へ移動します。空の欄で Backspace を押すと前の欄へ戻ります。</li>
+          <li>カードを右へスワイプでピン留め（先頭に固定）、左へスワイプで非表示にできます。</li>
+          <li>カード左上の「⠿」をドラッグすると並び替えられます（矢印キーの上下でも移動できます）。</li>
+          <li>表示している距離・並び順・テーマはこの端末にだけ保存されます。</li>
+        </ul>
+      </details>
     </footer>
   </div>
 
-  <script src="js/app.js?v=17"></script>
+  <script src="js/app.js?v=18"></script>
   <script>
     // 電波の弱い場所でも起動できるよう、アプリ本体をService Workerでキャッシュする
     if ('serviceWorker' in navigator) {

@@ -5,6 +5,8 @@
     distances: 'paceConverter.distances.v1',
     theme: 'paceConverter.theme',
     vdotRace: 'paceConverter.vdotRace.v1',
+    introDismissed: 'paceConverter.introDismissed.v1',
+    swipeCoachDismissed: 'paceConverter.swipeCoachDismissed.v1',
   };
 
   const DEFAULT_METERS = [50, 200, 400, 800, 1000, 1500, 3000, 5000, 10000];
@@ -51,12 +53,26 @@
   const resetBtn = document.getElementById('reset-btn');
   const themeToggleBtn = document.getElementById('theme-toggle-btn');
   const editDistancesBtn = document.getElementById('edit-distances-btn');
+  const addDistanceShortcutBtn = document.getElementById('add-distance-shortcut');
   const paceMinInput = document.getElementById('pace-min-input');
   const paceSecInput = document.getElementById('pace-sec-input');
   const vdotBtn = document.getElementById('vdot-btn');
+  const introEl = document.getElementById('intro');
+  const introDismissBtn = document.getElementById('intro-dismiss');
+  const swipeCoachEl = document.getElementById('swipe-coach');
+  const swipeCoachDismissBtn = document.getElementById('swipe-coach-dismiss');
+  const paceHeroEl = document.getElementById('pace-hero');
+  const paceDerivedEl = document.getElementById('pace-derived');
+  const appTitleEl = document.getElementById('app-title');
+  const headerPaceBtn = document.getElementById('header-pace');
+  const headerPaceValueEl = headerPaceBtn.querySelector('.header-pace-value');
 
   // 現在の基準ペース（ms/m）。未入力なら null。
   let currentPace = null;
+  // いまのペースを決めた入力元。距離(メートル)か、ヒーローのペース欄なら 'pace'。
+  // 入力後に9枚のカードが全部同じ顔になり、どれが自分の入力でどれが計算結果か
+  // 分からなくなるのを防ぐためだけに持っている。
+  let paceSource = null;
   let distances = loadDistances();
 
   // ---------- 距離リストの永続化 ----------
@@ -199,6 +215,111 @@
     return meters >= 1000 && meters % 1000 === 0 ? `${meters / 1000}km` : null;
   }
 
+  // 編集モーダルの「よく使う距離」。初期値がトラック種目に寄っていて、
+  // ロードのレース距離(ハーフ・フル・1マイル)を出すには毎回メートル数を
+  // 手打ちする必要があった。ワンタップで出し入れできるようにする。
+  const PRESET_DISTANCES = [
+    { meters: 1609, label: '1マイル' },
+    { meters: 2000, label: '2km' },
+    { meters: 3000, label: '3km' },
+    { meters: 5000, label: '5km' },
+    { meters: 10000, label: '10km' },
+    { meters: 21097, label: 'ハーフ' },
+    { meters: 42195, label: 'フル' },
+  ];
+
+  // ---------- 距離ごとに必要な桁だけを出す ----------
+  //
+  // 全距離に hh/mm/ss/cs の4欄を常設すると、50mの「時」やフルマラソンの「ms」の
+  // ように、まず0以外にならない欄がタップ目標の間に挟まって精度と一覧性を落とす。
+  // 「時」の常設は5000mから。5000mを1時間超で走る（歩く）ことは実際にあるので、
+  // ここを上げすぎると直接入力で59分の壁に当たって詰む。逆に3000m以下では
+  // 1時間を超えることがないので、常に0の欄を挟まない。
+  const HOUR_FIELD_MIN_METERS = 5000; // これ以上なら「時」を常設する
+  const CENTI_FIELD_MAX_METERS = 3000; // これ以下なら「ms」を常設する
+
+  function unitAlwaysVisible(unit, meters) {
+    if (unit === 'hh') return meters >= HOUR_FIELD_MIN_METERS;
+    if (unit === 'cs') return meters <= CENTI_FIELD_MAX_METERS;
+    return true;
+  }
+
+  // 常設対象でない欄も、0以外の値が入った時点で必ず出す。値があるのに隠すと
+  // 「入力が消えた」ように見えるうえ、合計タイムの読み方まで嘘になる。
+  function updateUnitVisibility(meters) {
+    const card = listEl.querySelector(`.distance-card[data-distance="${meters}"]`);
+    if (!card) return;
+    let firstVisibleCell = null;
+    UNITS.forEach((unit) => {
+      const cell = card.querySelector(`.unit-cell[data-unit="${unit}"]`);
+      if (!cell) return;
+      const input = cell.querySelector('input');
+      const value = parseInt(input.value, 10);
+      const show =
+        unitAlwaysVisible(unit, meters) ||
+        (Number.isFinite(value) && value > 0) ||
+        // 入力中の欄を足元から消さない（打ち終わって0のままなら次の更新で畳まれる）
+        document.activeElement === input;
+      cell.hidden = !show;
+      if (show && !firstVisibleCell) firstVisibleCell = cell;
+    });
+    // 区切り文字は「その欄の手前」に属させてあるので、欄と一緒に畳まれる。
+    // 先頭に来た欄の区切りだけは、行頭の ":" が残らないようここで消す。
+    card.querySelectorAll('.unit-sep').forEach((sep) => {
+      sep.hidden = sep.parentElement === firstVisibleCell;
+    });
+  }
+
+  function updateAllUnitVisibility() {
+    visibleDistances().forEach(({ meters }) => updateUnitVisibility(meters));
+  }
+
+  // ---------- 値が書き換わった瞬間を見せる ----------
+  //
+  // 他の距離の数字は黙って差し替わるだけなので、「1つ入れれば全部が連動する」
+  // というこのアプリ唯一の売りが、使っていても体感できていなかった。
+  const FLASH_MS = 420; // css の value-flash と合わせる
+  const pendingFlash = new Set();
+  let flashingNodes = [];
+  let flashScheduled = false;
+  let flashClearTimer = null;
+
+  function clearFlash() {
+    flashingNodes.forEach((n) => n.classList.remove('is-flashing'));
+    flashingNodes = [];
+  }
+
+  function flashInput(el) {
+    if (el === document.activeElement) return;
+    pendingFlash.add(el);
+    if (flashScheduled) return;
+    flashScheduled = true;
+    requestAnimationFrame(() => {
+      flashScheduled = false;
+      // 直前に光らせた欄も含めて一度全部外す。animationend は環境によっては
+      // 飛んでこないので、後始末はイベントに頼らずこちらで確実に行う。
+      clearFlash();
+      if (flashClearTimer !== null) clearTimeout(flashClearTimer);
+      // アニメーションを再生し直すためのリフローは、1フレームに1回だけにする
+      // （欄ごとに offsetWidth を読むと入力のたびに数十回の強制同期レイアウトになる）
+      void listEl.offsetWidth;
+      flashingNodes = Array.from(pendingFlash);
+      flashingNodes.forEach((n) => n.classList.add('is-flashing'));
+      pendingFlash.clear();
+      flashClearTimer = setTimeout(() => {
+        flashClearTimer = null;
+        clearFlash();
+      }, FLASH_MS);
+    });
+  }
+
+  // 「いま自分が打った値はどれか」をカード側に残す
+  function updateSourceHighlight() {
+    listEl.querySelectorAll('.distance-card').forEach((card) => {
+      card.classList.toggle('is-source', Number(card.dataset.distance) === paceSource);
+    });
+  }
+
   function addCustomDistance(meters) {
     if (!Number.isFinite(meters) || meters <= 0 || !Number.isInteger(meters)) {
       return { ok: false, error: '1m以上の整数で入力してください' };
@@ -282,10 +403,17 @@
         });
         const input = newCard.querySelector(`input[data-unit="${editing.unit}"]`);
         if (input) {
+          // 描き直した直後は活性要素がbodyなので、編集中だった欄が「値0だから」
+          // という理由で畳まれていることがある。畳まれた欄にはフォーカスが入らず
+          // 入力途中の数字が見えないまま残るので、先に開いてから focus する。
+          const cell = input.closest('.unit-cell');
+          if (cell) cell.hidden = false;
           input.focus();
           try {
             input.setSelectionRange(editing.selectionStart, editing.selectionEnd);
           } catch (e) {}
+          // 区切り文字の畳み方をいまの表示状態に合わせ直す
+          updateUnitVisibility(Number(editing.distance));
         }
       }
     }
@@ -294,6 +422,8 @@
   function togglePinDistance(meters) {
     const next = !isPinned(meters);
     setPinned(meters, next);
+    // 操作を覚えた人にヒントを出し続けない
+    dismissSwipeCoach(true);
     refreshCards();
     showToast(
       next ? `${formatMeters(meters)}をピン留めしました` : `${formatMeters(meters)}のピン留めを解除しました`
@@ -303,6 +433,7 @@
   // 非表示は編集モーダルを開かないと戻せないので、取り消せるトーストを必ず出す
   function hideDistance(meters) {
     setVisibility(meters, false);
+    dismissSwipeCoach(true);
     refreshCards();
     showToast(`${formatMeters(meters)}を非表示にしました`, '元に戻す', () => {
       setVisibility(meters, true);
@@ -322,12 +453,45 @@
     if (currentPace === null) {
       paceMinInput.value = '';
       paceSecInput.value = '';
+      updateDerivedInfo();
       return;
     }
     // ms/m と s/km は数値として同じ(×1000してから÷1000するだけなので)
     const totalSec = Math.round(currentPace);
     paceMinInput.value = String(Math.floor(totalSec / 60));
     paceSecInput.value = pad2(totalSec % 60);
+    updateDerivedInfo();
+  }
+
+  function formatPaceMinSec(totalSec) {
+    const t = Math.max(0, Math.round(totalSec));
+    return `${Math.floor(t / 60)}'${pad2(t % 60)}"`;
+  }
+
+  // ペースが決まったときだけ、ランナーが頭の中でやる換算(トラック1周・1マイル・
+  // 時速)を先回りして出す。あわせて「消すものが無いのに消すボタンが居座る」のを
+  // やめ、クリアはペースがあるときだけ出す。
+  function updateDerivedInfo() {
+    const hasValue = currentPace !== null;
+    const hasPace = hasValue && currentPace > 0;
+    resetBtn.hidden = !hasValue;
+    paceDerivedEl.hidden = !hasPace;
+
+    if (!hasPace) {
+      paceDerivedEl.innerHTML = '';
+      headerPaceValueEl.textContent = '';
+    } else {
+      const perKmSec = currentPace; // s/km == ms/m
+      paceDerivedEl.innerHTML = [
+        `<span class="derived-chip">400m 1周 <b>${formatPaceMinSec(perKmSec * 0.4)}</b></span>`,
+        `<span class="derived-chip">1マイル <b>${formatPaceMinSec(perKmSec * 1.609344)}</b></span>`,
+        `<span class="derived-chip">時速 <b>${(3600 / perKmSec).toFixed(1)}</b> km/h</span>`,
+      ].join('');
+      headerPaceValueEl.textContent = formatPaceMinSec(perKmSec);
+      // 一度でも使い方が分かった人に、初回向けの案内を出し続けない
+      dismissIntro(true);
+    }
+    syncHeaderPace();
   }
 
   // 上部のペース入力欄(分・秒)から currentPace を再計算し、全距離に反映する
@@ -335,7 +499,10 @@
     const min = parseInt(paceMinInput.value, 10) || 0;
     const sec = parseInt(paceSecInput.value, 10) || 0;
     currentPace = min * 60 + sec; // s/km == ms/m
+    paceSource = 'pace';
+    updateSourceHighlight();
     applyPaceToAllVisible();
+    updateDerivedInfo();
   }
 
   function onPaceSummaryInput(e) {
@@ -423,7 +590,7 @@
       card.appendChild(surface);
 
       const header = document.createElement('div');
-      header.className = 'flex items-center gap-2 mb-2';
+      header.className = 'flex items-center gap-2 mb-1.5';
       header.innerHTML = `
         <button type="button" class="drag-handle shrink-0 w-7 h-7 flex items-center justify-center rounded-full text-neutral-400 dark:text-neutral-600 touch-none cursor-grab active:cursor-grabbing" aria-label="${meters}mを並び替え（矢印キーの上下でも移動できます）" data-distance="${meters}">
           <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
@@ -432,10 +599,11 @@
             <circle cx="9" cy="18" r="1.6"></circle><circle cx="15" cy="18" r="1.6"></circle>
           </svg>
         </button>
-        <div class="flex-1 flex items-baseline justify-center gap-1.5">
+        <div class="flex-1 min-w-0 flex items-baseline justify-center gap-1.5">
           <span class="font-extrabold text-lime-600 dark:text-lime-400 text-lg">${meters.toLocaleString('ja-JP')}</span>
           <span class="text-xs text-neutral-500 dark:text-neutral-500 font-normal">m</span>
-          ${alt ? `<span class="text-[10px] text-neutral-400 dark:text-neutral-600 font-normal ml-1">(${alt})</span>` : ''}
+          ${alt ? `<span class="text-[10px] text-neutral-400 dark:text-neutral-600 font-normal">(${alt})</span>` : ''}
+          <span class="source-badge shrink-0 rounded-full bg-lime-600 dark:bg-lime-400 px-1.5 py-px text-[9px] font-bold leading-tight text-white dark:text-neutral-950">基準</span>
         </div>
         ${pinned
           ? `<span class="w-7 h-7 shrink-0 flex items-center justify-center text-lime-600 dark:text-lime-400" role="img" aria-label="ピン留め中">${PIN_ICON}</span>`
@@ -444,15 +612,24 @@
       surface.appendChild(header);
 
       const row = document.createElement('div');
-      row.className = 'flex items-center justify-center gap-0.5';
+      row.className = 'flex items-start justify-center';
 
       UNITS.forEach((unit, idx) => {
+        // 区切り文字は「その欄の手前」に置き、欄と同じ .unit-cell に入れておく。
+        // こうしておくと、桁を畳んだときに区切りも一緒に消えて行が破綻しない。
+        const cell = document.createElement('div');
+        cell.className = 'unit-cell flex items-start';
+        cell.dataset.unit = unit;
+
         if (idx > 0 && SEPARATOR[UNITS[idx - 1]]) {
           const sep = document.createElement('span');
-          sep.className = 'text-neutral-400 dark:text-neutral-500 font-mono text-lg px-0.5';
+          sep.className = 'unit-sep text-neutral-400 dark:text-neutral-500 font-mono text-lg px-1 pt-1.5';
           sep.textContent = SEPARATOR[UNITS[idx - 1]];
-          row.appendChild(sep);
+          cell.appendChild(sep);
         }
+
+        const stack = document.createElement('div');
+        stack.className = 'flex flex-col items-center';
 
         const input = document.createElement('input');
         input.type = 'number';
@@ -466,36 +643,29 @@
         input.autocomplete = 'off';
         input.setAttribute('aria-label', `${meters}m ${UNIT_LABEL[unit]}`);
         input.className =
-          'pace-input w-12 bg-neutral-200 dark:bg-neutral-800 rounded-xl text-center text-xl font-mono py-2.5 ' +
+          'pace-input w-14 bg-neutral-200 dark:bg-neutral-800 rounded-xl text-center text-xl font-mono py-2 ' +
           'focus:outline-none focus:ring-2 focus:ring-lime-600 dark:focus:ring-lime-400 text-neutral-900 dark:text-white transition-shadow';
         input.dataset.distance = String(meters);
         input.dataset.unit = unit;
+        stack.appendChild(input);
 
-        row.appendChild(input);
+        const label = document.createElement('span');
+        label.className = 'mt-0.5 text-[9px] leading-none text-neutral-400 dark:text-neutral-600 font-mono';
+        label.textContent = UNIT_LABEL[unit];
+        stack.appendChild(label);
+
+        cell.appendChild(stack);
+        row.appendChild(cell);
       });
 
       surface.appendChild(row);
-
-      const labels = document.createElement('div');
-      labels.className =
-        'flex justify-center gap-0.5 mt-1 text-[10px] text-neutral-400 dark:text-neutral-600 font-mono';
-      UNITS.forEach((unit, idx) => {
-        if (idx > 0 && SEPARATOR[UNITS[idx - 1]]) {
-          const spacer = document.createElement('span');
-          spacer.className = 'w-3';
-          labels.appendChild(spacer);
-        }
-        const l = document.createElement('span');
-        l.className = 'w-12 text-center';
-        l.textContent = UNIT_LABEL[unit];
-        labels.appendChild(l);
-      });
-      surface.appendChild(labels);
 
       frag.appendChild(card);
     });
 
     listEl.appendChild(frag);
+    updateAllUnitVisibility();
+    updateSourceHighlight();
   }
 
   function getInput(distance, unit) {
@@ -515,7 +685,26 @@
   }
 
   function setFieldValue(distance, unit, value) {
-    getInput(distance, unit).value = pad2(value);
+    const el = getInput(distance, unit);
+    if (!el) return;
+    const next = pad2(value);
+    if (el.value === next) return;
+    el.value = next;
+    flashInput(el);
+  }
+
+  // 桁を畳んでいる関係で、隣の欄が画面に出ていないことがある。
+  // フォーカス移動はいま見えている欄だけを辿る。
+  function neighborVisibleInput(distance, unit, direction) {
+    const inputs = getRowInputs(distance);
+    let idx = UNITS.indexOf(unit) + direction;
+    while (idx >= 0 && idx < inputs.length) {
+      const el = inputs[idx];
+      const cell = el && el.closest('.unit-cell');
+      if (el && cell && !cell.hidden) return el;
+      idx += direction;
+    }
+    return null;
   }
 
   // 距離の入力値を合計ミリ秒に変換（ミリ秒欄は2桁=センチ秒として ×10）
@@ -558,6 +747,8 @@
     const totalMs = distanceToMs(sourceDistance);
     const pace = totalMs / sourceDistance; // ms / m
     currentPace = pace;
+    paceSource = sourceDistance;
+    updateSourceHighlight();
     updatePaceSummaryFields();
 
     visibleDistances().forEach(({ meters }) => {
@@ -568,6 +759,7 @@
       setFieldValue(meters, 'ss', ss);
       setFieldValue(meters, 'cs', cs);
     });
+    updateAllUnitVisibility();
   }
 
   // 現在のペースを、表示中の全距離の欄に反映する（距離の追加・表示切替の直後に使用）。
@@ -588,6 +780,7 @@
       setFieldValue(meters, 'ss', ss);
       setFieldValue(meters, 'cs', cs);
     });
+    updateAllUnitVisibility();
   }
 
   function clampUnitValue(unit, value) {
@@ -610,9 +803,7 @@
 
     // 2桁入力されたら自動的に右隣の欄へフォーカス移動
     if (digits.length === 2) {
-      const inputs = getRowInputs(distance);
-      const idx = UNITS.indexOf(unit);
-      const next = inputs[idx + 1];
+      const next = neighborVisibleInput(distance, unit, 1);
       if (next) {
         next.focus();
         next.select();
@@ -630,9 +821,7 @@
 
     const distance = Number(input.dataset.distance);
     const unit = input.dataset.unit;
-    const inputs = getRowInputs(distance);
-    const idx = UNITS.indexOf(unit);
-    const prev = inputs[idx - 1];
+    const prev = neighborVisibleInput(distance, unit, -1);
     if (prev) {
       e.preventDefault();
       prev.focus();
@@ -658,17 +847,22 @@
 
   function resetAll() {
     currentPace = null;
+    paceSource = null;
+    updateSourceHighlight();
     visibleDistances().forEach(({ meters }) => {
       UNITS.forEach((unit) => {
         getInput(meters, unit).value = '';
       });
     });
-    updatePaceSummaryFields();
-    // フォーカスを残したままだとモバイルで数字キーボードが開いたままになるため外す
+    // フォーカスを残したままだとモバイルで数字キーボードが開いたままになるため外す。
+    // 桁の畳み直しより先に外す（活性中の欄は畳まれない仕様なので、後だと
+    // 空になった「時」や「ms」が1つだけ残って見える）。
     const active = document.activeElement;
     if (active && (active.classList.contains('pace-input') || active.classList.contains('pace-summary-input'))) {
       active.blur();
     }
+    updateAllUnitVisibility();
+    updatePaceSummaryFields();
   }
 
   // ---------- トースト（取り消し付きの通知） ----------
@@ -1282,7 +1476,7 @@
 
   // ---------- 距離編集モーダル ----------
 
-  let modalOverlay, modalList, newDistanceInput, newDistanceError;
+  let modalOverlay, modalList, presetChipsEl, newDistanceInput, newDistanceError;
 
   function buildModal() {
     modalOverlay = document.createElement('div');
@@ -1301,6 +1495,10 @@
             </svg>
           </button>
         </div>
+        <p class="text-[11px] font-semibold text-neutral-500 dark:text-neutral-400 mb-1.5">よく使う距離</p>
+        <div id="distance-preset-chips" class="flex flex-wrap gap-1.5 mb-3"></div>
+
+        <p class="text-[11px] font-semibold text-neutral-500 dark:text-neutral-400 mb-1">すべての距離</p>
         <p class="text-xs text-neutral-500 dark:text-neutral-400 mb-2 leading-relaxed">チェックを外すと一覧から非表示になります。ピンのアイコンを押すと、その距離を一覧の先頭に固定できます。</p>
         <div id="distance-modal-list" class="flex-1 overflow-y-auto space-y-0.5 -mx-1 px-1"></div>
         <div class="mt-3 pt-3 border-t border-lime-600/10 dark:border-lime-400/10">
@@ -1320,8 +1518,14 @@
     document.body.appendChild(modalOverlay);
 
     modalList = modalOverlay.querySelector('#distance-modal-list');
+    presetChipsEl = modalOverlay.querySelector('#distance-preset-chips');
     newDistanceInput = modalOverlay.querySelector('#new-distance-input');
     newDistanceError = modalOverlay.querySelector('#new-distance-error');
+
+    presetChipsEl.addEventListener('click', (e) => {
+      const chip = e.target.closest('.preset-chip');
+      if (chip) togglePresetDistance(Number(chip.dataset.meters));
+    });
 
     modalOverlay.querySelector('#distance-modal-close').addEventListener('click', closeModal);
     modalOverlay.addEventListener('click', (e) => {
@@ -1367,6 +1571,33 @@
         onDistancesChanged();
       }
     });
+  }
+
+  // チップ1つで「追加して表示」「非表示に戻す」まで完結させる。
+  // 押した結果が aria-pressed の見た目にそのまま出るので、
+  // 追加できたかどうかを下の一覧まで確かめに行かなくてよい。
+  function togglePresetDistance(meters) {
+    const existing = distances.find((d) => d.meters === meters);
+    if (!existing) {
+      const result = addCustomDistance(meters);
+      if (!result.ok) {
+        showToast(result.error);
+        return;
+      }
+    } else {
+      setVisibility(meters, !existing.visible);
+    }
+    onDistancesChanged();
+  }
+
+  function renderPresetChips() {
+    presetChipsEl.innerHTML = PRESET_DISTANCES.map(({ meters, label }) => {
+      const d = distances.find((x) => x.meters === meters);
+      const on = !!(d && d.visible);
+      return `<button type="button" class="preset-chip" data-meters="${meters}" aria-pressed="${on}">
+        <span aria-hidden="true">${on ? '✓' : '＋'}</span>${label}
+      </button>`;
+    }).join('');
   }
 
   function renderModalList() {
@@ -1423,16 +1654,20 @@
     renderCards();
     applyPaceToAllVisible();
     renderModalList();
+    renderPresetChips();
   }
 
-  function openModal() {
+  // triggerEl は閉じたときにフォーカスを戻す先。ヘッダーの編集ボタンと
+  // 一覧末尾のショートカットのどちらから開いたかで戻り先が変わる。
+  function openModal(triggerEl) {
     renderModalList();
+    renderPresetChips();
     modalOverlay.classList.remove('hidden');
     modalOverlay.classList.add('flex');
     document.body.classList.add('modal-open');
     newDistanceInput.value = '';
     newDistanceError.classList.add('hidden');
-    focusModalOnOpen(modalOverlay.querySelector('#distance-modal-panel'), editDistancesBtn);
+    focusModalOnOpen(modalOverlay.querySelector('#distance-modal-panel'), triggerEl || editDistancesBtn);
   }
 
   function closeModal() {
@@ -1620,6 +1855,8 @@
 
   let vdotModalOverlay,
     vdotDistanceSelect,
+    vdotImportBtn,
+    vdotImportLabel,
     vdotCustomWrap,
     vdotCustomInput,
     vdotHhInput,
@@ -1803,6 +2040,15 @@
         <p class="text-xs text-neutral-500 dark:text-neutral-400 mb-1 leading-relaxed">直近のレース結果を入力すると、フィットネス指標「VDOT」と5つのトレーニングペースの目安を計算します。使わなくてもタイム換算機能は普通に使えます。</p>
         <p class="text-[10px] text-neutral-400 dark:text-neutral-600 mb-3 leading-relaxed">各ペースの名前をタップすると、練習の目安ややり方が見られます。</p>
 
+        <button id="vdot-import-btn" type="button" hidden class="btn-secondary w-full mb-3">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-4 h-4">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+            <polyline points="7 10 12 15 17 10"></polyline>
+            <line x1="12" y1="15" x2="12" y2="3"></line>
+          </svg>
+          <span id="vdot-import-label">メイン画面の入力を取り込む</span>
+        </button>
+
         <label class="block text-xs font-semibold text-neutral-500 dark:text-neutral-400 mb-1">距離</label>
         <select id="vdot-distance-select"
           class="w-full bg-neutral-100 dark:bg-neutral-800 rounded-xl px-3 py-2 text-sm text-neutral-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-lime-600 dark:focus:ring-lime-400 mb-2">
@@ -1903,6 +2149,9 @@
     document.body.appendChild(vdotModalOverlay);
 
     vdotDistanceSelect = vdotModalOverlay.querySelector('#vdot-distance-select');
+    vdotImportBtn = vdotModalOverlay.querySelector('#vdot-import-btn');
+    vdotImportLabel = vdotModalOverlay.querySelector('#vdot-import-label');
+    vdotImportBtn.addEventListener('click', importMainInputIntoVdot);
     vdotCustomWrap = vdotModalOverlay.querySelector('#vdot-custom-distance-wrap');
     vdotCustomInput = vdotModalOverlay.querySelector('#vdot-custom-distance-input');
     vdotHhInput = vdotModalOverlay.querySelector('#vdot-hh-input');
@@ -2005,29 +2254,58 @@
     vdotModalOverlay.addEventListener('focusin', onVdotTimeFocusIn);
   }
 
+  // メイン画面で「基準」になっている距離とタイム。取り込みボタンの出し分けに使う。
+  function mainInputForVdot() {
+    if (typeof paceSource !== 'number') return null;
+    if (!listEl.querySelector(`.distance-card[data-distance="${paceSource}"]`)) return null;
+    const totalMs = distanceToMs(paceSource);
+    if (!(totalMs > 0)) return null;
+    return { meters: paceSource, totalMs };
+  }
+
+  function applyVdotRace(meters, totalMs) {
+    const preset = VDOT_PRESET_DISTANCES.find((d) => d.meters === meters);
+    if (preset) {
+      vdotDistanceSelect.value = String(preset.meters);
+      vdotCustomWrap.classList.add('hidden');
+      vdotCustomInput.value = '';
+    } else {
+      vdotDistanceSelect.value = 'custom';
+      vdotCustomInput.value = String(meters);
+      vdotCustomWrap.classList.remove('hidden');
+    }
+    const { hh, mm, ss, cs } = msToFields(totalMs);
+    setVdotField('hh', hh);
+    setVdotField('mm', mm);
+    setVdotField('ss', ss);
+    setVdotField('cs', cs);
+    recalcVdot();
+  }
+
+  function importMainInputIntoVdot() {
+    const src = mainInputForVdot();
+    if (!src) return;
+    applyVdotRace(src.meters, src.totalMs);
+    showToast(`${formatMeters(src.meters)}の入力を取り込みました`);
+  }
+
   function openVdotModal() {
     const saved = loadVdotRace();
     if (saved) {
-      const preset = VDOT_PRESET_DISTANCES.find((d) => d.meters === saved.meters);
-      if (preset) {
-        vdotDistanceSelect.value = String(preset.meters);
-        vdotCustomWrap.classList.add('hidden');
-        vdotCustomInput.value = '';
-      } else {
-        vdotDistanceSelect.value = 'custom';
-        vdotCustomInput.value = String(saved.meters);
-        vdotCustomWrap.classList.remove('hidden');
-      }
-      const { hh, mm, ss, cs } = msToFields(saved.totalMs);
-      setVdotField('hh', hh);
-      setVdotField('mm', mm);
-      setVdotField('ss', ss);
-      setVdotField('cs', cs);
+      applyVdotRace(saved.meters, saved.totalMs);
     } else {
       vdotDistanceSelect.value = '5000';
       vdotCustomWrap.classList.add('hidden');
       vdotCustomInput.value = '';
       vdotTimeInputs().forEach((el) => { el.value = ''; });
+    }
+
+    // メイン画面に打ち込んだレース結果を、もう一度打ち直させない。
+    // 常時同期はしない（レースペースと練習ペースは別物なので、押したときだけ移す）。
+    const src = mainInputForVdot();
+    vdotImportBtn.hidden = !src;
+    if (src) {
+      vdotImportLabel.textContent = `メイン画面の ${formatMeters(src.meters)} を取り込む`;
     }
 
     recalcVdot();
@@ -2044,6 +2322,77 @@
     vdotModalOverlay.classList.remove('flex');
     document.body.classList.remove('modal-open');
     restoreFocusOnClose();
+  }
+
+  // ---------- 初回向けの案内とヘッダー ----------
+
+  function readFlag(key) {
+    try {
+      return localStorage.getItem(key) === '1';
+    } catch (e) {
+      return false;
+    }
+  }
+
+  function writeFlag(key) {
+    try {
+      localStorage.setItem(key, '1');
+    } catch (e) {
+      // 保存できなくても、その場での利用は続けられる
+    }
+  }
+
+  // 説明とバッジは初回訪問者のためのもの。毎日使う人の一等地を恒久的に
+  // 占領させない（実際にペースを入れた時点で、説明の役目は終わっている）。
+  function dismissIntro(persist) {
+    if (introEl.hidden) return;
+    introEl.hidden = true;
+    if (persist) writeFlag(STORAGE_KEYS.introDismissed);
+  }
+
+  function dismissSwipeCoach(persist) {
+    if (swipeCoachEl.hidden) return;
+    swipeCoachEl.hidden = true;
+    if (persist) writeFlag(STORAGE_KEYS.swipeCoachDismissed);
+  }
+
+  function initFirstRunHints() {
+    introEl.hidden = readFlag(STORAGE_KEYS.introDismissed);
+    swipeCoachEl.hidden = readFlag(STORAGE_KEYS.swipeCoachDismissed);
+    introDismissBtn.addEventListener('click', () => dismissIntro(true));
+    swipeCoachDismissBtn.addEventListener('click', () => dismissSwipeCoach(true));
+  }
+
+  // ヒーローのペース欄が画面外へ出たら、ヘッダーのタイトルを基準ペースに差し替える。
+  // 距離を増やすほど一覧は長くなるので、下の方を見ている間も「いま何分何秒/kmの
+  // 話をしているのか」が消えないようにする。
+  let heroOffScreen = false;
+
+  function syncHeaderPace() {
+    const show = heroOffScreen && currentPace !== null && currentPace > 0;
+    // h1をhiddenで消すと、スクロール中だけページから見出しが無くなり、
+    // 見出し送りで移動している人が迷子になる。場所だけ譲って中身は残す。
+    appTitleEl.classList.toggle('sr-only', show);
+    headerPaceBtn.hidden = !show;
+    headerPaceBtn.classList.toggle('flex', show);
+  }
+
+  function initHeaderPaceSwap() {
+    headerPaceBtn.addEventListener('click', () => {
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      paceMinInput.focus();
+      paceMinInput.select();
+    });
+    if (!('IntersectionObserver' in window)) return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        heroOffScreen = !entries[0].isIntersecting;
+        syncHeaderPace();
+      },
+      // ヘッダーの下に隠れた時点で「画面外」とみなす
+      { rootMargin: '-64px 0px 0px 0px', threshold: 0 }
+    );
+    observer.observe(paceHeroEl);
   }
 
   // ---------- 初期化 ----------
@@ -2084,10 +2433,14 @@
     paceSecInput.addEventListener('focusin', onPaceSummaryFocusIn);
 
     initTheme();
+    initFirstRunHints();
+    initHeaderPaceSwap();
+    updateDerivedInfo();
 
     buildToast();
     buildModal();
-    editDistancesBtn.addEventListener('click', openModal);
+    editDistancesBtn.addEventListener('click', () => openModal(editDistancesBtn));
+    addDistanceShortcutBtn.addEventListener('click', () => openModal(addDistanceShortcutBtn));
 
     buildVdotModal();
     vdotBtn.addEventListener('click', openVdotModal);

@@ -1550,7 +1550,7 @@
 
     addDistanceBtn.addEventListener('click', handleAddDistance);
     newDistanceInput.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter') {
+      if (e.key === 'Enter' && !addDistanceBtn.disabled) {
         e.preventDefault();
         handleAddDistance();
       }
@@ -1660,7 +1660,10 @@
     // 高さ計算に左右されず常に見えている領域の下端に貼り付く。
     modalListFade = document.createElement('div');
     modalListFade.className =
-      'pointer-events-none sticky bottom-0 -mt-8 h-8 bg-gradient-to-t from-white dark:from-neutral-900 to-transparent opacity-0 transition-opacity duration-150';
+      'pointer-events-none sticky bottom-0 h-8 bg-gradient-to-t from-white dark:from-neutral-900 to-transparent opacity-0 transition-opacity duration-150';
+    // space-y-1のmargin-topルールがクラスの-mt-8より詳細度で勝ってしまうため、
+    // インラインstyleで確実に上書きする（親のflex高さと無関係に効かせるため）。
+    modalListFade.style.marginTop = '-2rem';
     modalList.appendChild(modalListFade);
     updateModalListFade();
   }

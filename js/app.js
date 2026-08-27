@@ -1481,7 +1481,7 @@
 
   // ---------- 距離編集モーダル ----------
 
-  let modalOverlay, modalList, presetChipsEl, newDistanceInput, newDistanceError;
+  let modalOverlay, modalList, presetChipsEl, newDistanceInput, newDistanceError, addDistanceBtn;
 
   function buildModal() {
     modalOverlay = document.createElement('div');
@@ -1511,8 +1511,8 @@
             <input id="new-distance-input" type="number" min="1" max="${MAX_METERS}" step="1" inputmode="numeric"
               placeholder="距離を追加 (m)"
               class="flex-1 min-w-0 bg-neutral-100 dark:bg-neutral-800 rounded-xl px-3 py-2 text-sm text-neutral-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-lime-600 dark:focus:ring-lime-400">
-            <button id="add-distance-btn" type="button"
-              class="px-4 py-2 rounded-xl bg-gradient-to-r from-lime-600 to-green-500 dark:from-lime-400 dark:to-green-300 text-white dark:text-neutral-950 text-sm font-bold shadow-md shadow-lime-600/30 dark:shadow-lime-400/20 hover:-translate-y-0.5 active:translate-y-0 active:scale-95 transition shrink-0">
+            <button id="add-distance-btn" type="button" disabled
+              class="px-4 py-2 rounded-xl border border-lime-600/40 dark:border-lime-400/40 text-lime-700 dark:text-lime-300 text-sm font-bold transition shrink-0 disabled:opacity-30 disabled:cursor-not-allowed enabled:active:scale-95 enabled:hover:bg-lime-600/10 dark:enabled:hover:bg-lime-400/10">
               追加
             </button>
           </div>
@@ -1526,6 +1526,7 @@
     presetChipsEl = modalOverlay.querySelector('#distance-preset-chips');
     newDistanceInput = modalOverlay.querySelector('#new-distance-input');
     newDistanceError = modalOverlay.querySelector('#new-distance-error');
+    addDistanceBtn = modalOverlay.querySelector('#add-distance-btn');
 
     presetChipsEl.addEventListener('click', (e) => {
       const chip = e.target.closest('.preset-chip');
@@ -1547,12 +1548,15 @@
       trapFocusKeydown(modalOverlay.querySelector('#distance-modal-panel'), e);
     });
 
-    modalOverlay.querySelector('#add-distance-btn').addEventListener('click', handleAddDistance);
+    addDistanceBtn.addEventListener('click', handleAddDistance);
     newDistanceInput.addEventListener('keydown', (e) => {
       if (e.key === 'Enter') {
         e.preventDefault();
         handleAddDistance();
       }
+    });
+    newDistanceInput.addEventListener('input', () => {
+      addDistanceBtn.disabled = newDistanceInput.value.trim() === '';
     });
 
     modalList.addEventListener('change', (e) => {
@@ -1653,6 +1657,7 @@
     }
     newDistanceError.classList.add('hidden');
     newDistanceInput.value = '';
+    addDistanceBtn.disabled = true;
     onDistancesChanged();
     newDistanceInput.focus();
   }
@@ -1676,6 +1681,7 @@
     document.body.classList.add('modal-open');
     newDistanceInput.value = '';
     newDistanceError.classList.add('hidden');
+    addDistanceBtn.disabled = true;
     focusModalOnOpen(modalOverlay.querySelector('#distance-modal-panel'), triggerEl || editDistancesBtn);
   }
 

@@ -1481,7 +1481,7 @@
 
   // ---------- 距離編集モーダル ----------
 
-  let modalOverlay, modalList, presetChipsEl, newDistanceInput, newDistanceError, addDistanceBtn;
+  let modalOverlay, modalList, modalListFade, presetChipsEl, newDistanceInput, newDistanceError, addDistanceBtn;
 
   function buildModal() {
     modalOverlay = document.createElement('div');
@@ -1505,7 +1505,7 @@
 
         <p class="text-[11px] font-semibold text-neutral-500 dark:text-neutral-400 mb-1">すべての距離</p>
         <p class="text-xs text-neutral-500 dark:text-neutral-400 mb-2 leading-relaxed">チェックを外すと一覧から非表示になります。ピンのアイコンを押すと、その距離を一覧の先頭に固定できます。</p>
-        <div id="distance-modal-list" class="flex-1 overflow-y-auto space-y-0.5 -mx-1 px-1"></div>
+        <div id="distance-modal-list" class="flex-1 overflow-y-auto space-y-1 -mx-1 px-1"></div>
         <div class="mt-3 pt-3 border-t border-lime-600/10 dark:border-lime-400/10">
           <div class="flex gap-2">
             <input id="new-distance-input" type="number" min="1" max="${MAX_METERS}" step="1" inputmode="numeric"
@@ -1582,6 +1582,16 @@
         onDistancesChanged();
       }
     });
+    modalList.addEventListener('scroll', updateModalListFade);
+  }
+
+  // 一覧がスクロール可能で、かつ下端まで達していない間だけ下端をフェードさせ、
+  // 「まだ下に続きがある」ことを一目で分かるようにする。
+  function updateModalListFade() {
+    if (!modalListFade) return;
+    const hasMoreBelow = modalList.scrollHeight - modalList.scrollTop - modalList.clientHeight > 4;
+    modalListFade.classList.toggle('opacity-100', hasMoreBelow);
+    modalListFade.classList.toggle('opacity-0', !hasMoreBelow);
   }
 
   // チップ1つで「追加して表示」「非表示に戻す」まで完結させる。
@@ -1645,6 +1655,14 @@
       `;
       modalList.appendChild(row);
     });
+    // スクロール可能な間だけ下端をフェードさせ、まだ続きがあることを示す。
+    // モーダル内の最後の子要素として sticky 配置することで、外側のflexの
+    // 高さ計算に左右されず常に見えている領域の下端に貼り付く。
+    modalListFade = document.createElement('div');
+    modalListFade.className =
+      'pointer-events-none sticky bottom-0 -mt-8 h-8 bg-gradient-to-t from-white dark:from-neutral-900 to-transparent opacity-0 transition-opacity duration-150';
+    modalList.appendChild(modalListFade);
+    updateModalListFade();
   }
 
   function handleAddDistance() {
@@ -1683,6 +1701,8 @@
     newDistanceError.classList.add('hidden');
     addDistanceBtn.disabled = true;
     focusModalOnOpen(modalOverlay.querySelector('#distance-modal-panel'), triggerEl || editDistancesBtn);
+    // 開いた直後はまだ非表示だったため高さが取れていない。表示後に測り直す。
+    requestAnimationFrame(updateModalListFade);
   }
 
   function closeModal() {

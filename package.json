@@ -1,0 +1,12 @@
+{
+  "name": "pace-converter",
+  "version": "0.0.0",
+  "private": true,
+  "description": "ランナー向けペース相互換算Webアプリ。アプリ本体に依存パッケージは無く、npmはテストと版管理のためだけに使う（ビルド工程は存在しない）。",
+  "scripts": {
+    "test": "node --test tests/*.test.mjs",
+    "version:check": "node tools/version.mjs check",
+    "version:bump": "node tools/version.mjs bump",
+    "serve": "python3 -m http.server 8000"
+  }
+}

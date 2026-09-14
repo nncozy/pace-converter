@@ -1,15 +1,18 @@
 'use strict';
 
-// css/js の ?v=N とあわせて、更新のたびにこの番号を上げること。
-// 変えないと、古いキャッシュが端末に残り続けてしまう。
-const CACHE_VERSION = 'v20';
-const CACHE_NAME = `pace-converter-${CACHE_VERSION}`;
+// Service Worker側の版はこの1箇所だけ。index.html の ?v=N と必ず同じ値にすること。
+// ズレると、Service Workerだけが古いキャッシュを配り続けて更新が届かなくなる。
+// 手で書き換えず `node tools/version.mjs bump` を使う（ズレは npm test で検出される）。
+const ASSET_VERSION = 21;
+const CACHE_NAME = `pace-converter-v${ASSET_VERSION}`;
+
+// ?v=N 付きで読み込んでいるファイル。index.html 側の記述と対になっている。
+const VERSIONED_URLS = ['./css/style.css', './js/calc.js', './js/app.js'];
 
 const PRECACHE_URLS = [
   './',
   './index.html',
-  './css/style.css?v=20',
-  './js/app.js?v=20',
+  ...VERSIONED_URLS.map((url) => `${url}?v=${ASSET_VERSION}`),
   './manifest.webmanifest',
   './favicon.svg',
   './favicon.ico',

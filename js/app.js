@@ -12,9 +12,22 @@
   const DEFAULT_METERS = [50, 200, 400, 800, 1000, 1500, 3000, 5000, 10000];
   const MAX_METERS = 200000; // 200km 相当を上限とする
 
+  // 計算だけを担う部分は js/calc.js に分離してある（Nodeから直接テストするため）。
+  const {
+    UNIT_MAX,
+    pad2,
+    formatPaceMinSec,
+    formatDurationSec,
+    formatPaceSecPerKm,
+    msToFields,
+    vdotFromPerformance,
+    predictRaceTimeSec,
+    trainingPaceSecPerKm,
+    ZONE_PCT,
+  } = window.PaceCalc;
+
   // 表示順: 時・分・秒・ミリ秒(2桁=センチ秒)
   const UNITS = ['hh', 'mm', 'ss', 'cs'];
-  const UNIT_MAX = { hh: 99, mm: 59, ss: 59, cs: 99 };
   const UNIT_LABEL = { hh: '時', mm: '分', ss: '秒', cs: 'ms' };
   const SEPARATOR = { hh: ':', mm: ':', ss: '.', cs: '' };
 
@@ -448,10 +461,6 @@
 
   // ---------- 距離カード（メイン画面） ----------
 
-  function pad2(n) {
-    return String(Math.max(0, n)).padStart(2, '0');
-  }
-
   // 現在の基準ペース(ms/m)を上部の分・秒入力欄に反映する。
   // ペース欄自身が入力元のときは呼ばない(自分の入力中に上書きしないため)。
   function updatePaceSummaryFields() {
@@ -466,11 +475,6 @@
     paceMinInput.value = String(Math.floor(totalSec / 60));
     paceSecInput.value = pad2(totalSec % 60);
     updateDerivedInfo();
-  }
-
-  function formatPaceMinSec(totalSec) {
-    const t = Math.max(0, Math.round(totalSec));
-    return `${Math.floor(t / 60)}'${pad2(t % 60)}"`;
   }
 
   // ペースが決まったときだけ、ランナーが頭の中でやる換算(トラック1周・1マイル・
@@ -719,32 +723,6 @@
     const ss = getFieldValue(distance, 'ss');
     const cs = getFieldValue(distance, 'cs');
     return (hh * 3600 + mm * 60 + ss) * 1000 + cs * 10;
-  }
-
-  // 合計ミリ秒を hh/mm/ss/cs に変換（繰り上がり処理込み）
-  function msToFields(ms) {
-    ms = Math.max(0, Math.round(ms / 10) * 10);
-    let hh = Math.floor(ms / 3600000);
-    ms -= hh * 3600000;
-    let mm = Math.floor(ms / 60000);
-    ms -= mm * 60000;
-    let ss = Math.floor(ms / 1000);
-    ms -= ss * 1000;
-    let cs = Math.round(ms / 10);
-
-    if (cs >= 100) { cs -= 100; ss += 1; }
-    if (ss >= 60) { ss -= 60; mm += 1; }
-    if (mm >= 60) { mm -= 60; hh += 1; }
-
-    // 「時」欄は2桁固定のレイアウトなので、それを超える巨大な値は表示上99:59:59.99に丸める
-    if (hh > UNIT_MAX.hh) {
-      hh = UNIT_MAX.hh;
-      mm = 59;
-      ss = 59;
-      cs = 99;
-    }
-
-    return { hh, mm, ss, cs };
   }
 
   // sourceDistance の入力を基準に、他のすべての距離の欄を再計算して書き換える
@@ -1720,9 +1698,9 @@
   //
   // Jack Daniels & Jimmy Gilbert の式（Oxygen Power, 1979）でレース実績から
   // VDOT（フィットネス指標）を算出し、同じ式を逆算してトレーニングペース
-  // ゾーンごとの目安ペースを求める。ゾーンの%VO2max値(0.70/0.84/0.88/0.98/1.05)
-  // は、公開されているVDOT換算表の実測値（例: VDOT50でE 5'07"/km, M 4'25"/km,
-  // T 4'15"/km, I 3'54"/km, R 3'41"/km）と一致することを確認済み。
+  // ゾーンごとの目安ペースを求める。計算式そのものと各ゾーンの%VO2maxは
+  // js/calc.js にあり、公開されているVDOT換算表の実測値と一致することは
+  // tests/calc.test.mjs が検証している。ここにあるのは画面の組み立てだけ。
 
   // プリセットは10km以下のレース距離のみ（ハーフ/フルは想定利用者の対象外のため入れない。
   // 必要なら「その他」から自由入力できる）
@@ -1767,109 +1745,43 @@
     return VDOT_LEVELS.find((l) => vdot < l.max) || VDOT_LEVELS[VDOT_LEVELS.length - 1];
   }
 
-  function formatDurationSec(sec) {
-    const total = Math.max(0, Math.round(sec));
-    const h = Math.floor(total / 3600);
-    const m = Math.floor((total % 3600) / 60);
-    const s = total % 60;
-    return h > 0 ? `${h}:${pad2(m)}:${pad2(s)}` : `${m}:${pad2(s)}`;
-  }
-
   const TRAINING_ZONES = [
     {
       key: 'E',
       label: 'イージー / LSD',
       desc: '楽に会話できるペース。有酸素の土台作り',
-      pct: 0.70,
+      pct: ZONE_PCT.E,
       hint: '会話ができるくらい余裕のあるペース。練習の大部分（週の7〜8割くらい）はこの強度で十分です。30分〜2時間ほど、息が弾みすぎない範囲でゆっくり走りましょう。',
     },
     {
       key: 'M',
       label: 'マラソン',
       desc: 'フルマラソンのレースペースの目安',
-      pct: 0.84,
+      pct: ZONE_PCT.M,
       hint: 'フルマラソンを走るときの目標ペースです。10kmまでしか出ない場合でも、「ちょっと頑張る」持続走（20〜60分ほど）の強度の目安として使えます。',
     },
     {
       key: 'T',
       label: '閾値走',
       desc: '「ややきつい」を1時間ほど保てるペース',
-      pct: 0.88,
+      pct: ZONE_PCT.T,
       hint: 'きついけど一言二言なら会話できる強度。乳酸がたまり始める境目を押し上げる練習です。20分間走り続けるか、5〜10分の反復を短い休憩（1〜2分のジョグ）を挟んで数本行うのがおすすめ。合計20〜40分くらいが目安です。',
     },
     {
       key: 'I',
       label: 'インターバル',
       desc: 'VO2maxを鍛える高強度ペース',
-      pct: 0.98,
+      pct: ZONE_PCT.I,
       hint: 'きついが全力ではない強度。3〜5分ほど走って、同じくらいの時間のジョグで回復、を繰り返します（例: 1000mを5本、間はジョグで2〜3分）。フォームが崩れるほど追い込まず、余裕がなくなったら本数を減らして大丈夫です。',
     },
     {
       key: 'R',
       label: 'レペティション',
       desc: 'フォームとスピードを鍛える全力に近いペース',
-      pct: 1.05,
+      pct: ZONE_PCT.R,
       hint: '速いフォームとスピード感を養うための短い反復走です。200〜400mほどを、しっかり休んで（反復と同じか長めのジョグ・レスト）繰り返します。追い込む練習ではないので、疲れすぎない本数に留めましょう。',
     },
   ];
-
-  function vo2FromVelocity(v) {
-    // vは m/min
-    return -4.6 + 0.182258 * v + 0.000104 * v * v;
-  }
-
-  function percentVO2Max(tMin) {
-    return (
-      0.8 +
-      0.1894393 * Math.exp(-0.012778 * tMin) +
-      0.2989558 * Math.exp(-0.1932605 * tMin)
-    );
-  }
-
-  function vdotFromPerformance(meters, totalSec) {
-    const tMin = totalSec / 60;
-    const v = meters / tMin; // m/min
-    return vo2FromVelocity(v) / percentVO2Max(tMin);
-  }
-
-  // 指定距離をこのVDOTで走った場合の予想タイム(秒)を求める。
-  // vdotFromPerformance(meters, t)はtについて単調減少なので二分探索で逆算できる
-  // （実測値: VDOT50で5km≈19'56", 10km≈41'20", ハーフ≈1:31:31, フル≈3:10:40 と一致確認済み）。
-  function predictRaceTimeSec(vdot, meters) {
-    let lo = 30; // 30秒
-    let hi = 30 * 3600; // 30時間
-    for (let i = 0; i < 60; i++) {
-      const mid = (lo + hi) / 2;
-      const requiredVdot = vdotFromPerformance(meters, mid);
-      if (requiredVdot > vdot) lo = mid;
-      else hi = mid;
-    }
-    return (lo + hi) / 2;
-  }
-
-  // vo2FromVelocity(v) = vo2 を v について解く（2次方程式の解の公式）
-  function velocityFromVO2(vo2) {
-    const a = 0.000104;
-    const b = 0.182258;
-    const c = -(4.6 + vo2);
-    const discriminant = b * b - 4 * a * c;
-    if (discriminant < 0) return null;
-    return (-b + Math.sqrt(discriminant)) / (2 * a); // m/min
-  }
-
-  function trainingPaceSecPerKm(vdot, pct) {
-    const v = velocityFromVO2(vdot * pct);
-    if (!v || v <= 0) return null;
-    return (1000 / v) * 60;
-  }
-
-  function formatPaceSecPerKm(sec) {
-    if (sec === null || !Number.isFinite(sec)) return '--\'--"';
-    const total = Math.round(sec);
-    const m = Math.floor(total / 60);
-    const s = total % 60;
-    return `${m}'${pad2(s)}"`;
-  }
 
   function loadVdotRace() {
     try {

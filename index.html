@@ -49,7 +49,7 @@
     } catch (e) {}
   })();
 </script>
-<link rel="stylesheet" href="css/style.css?v=20">
+<link rel="stylesheet" href="css/style.css?v=21">
 </head>
 <body class="bg-[#f7faf2] dark:bg-[#0a0e08] text-neutral-900 dark:text-white min-h-screen antialiased transition-colors">
   <div class="max-w-md mx-auto px-4 pb-16">
@@ -257,7 +257,9 @@
     </div>
   </div>
 
-  <script src="js/app.js?v=20"></script>
+  <!-- calc.js は app.js が起動時に読む純粋計算部分。必ず app.js より先に置くこと -->
+  <script src="js/calc.js?v=21"></script>
+  <script src="js/app.js?v=21"></script>
   <script>
     // 電波の弱い場所でも起動できるよう、アプリ本体をService Workerでキャッシュする
     if ('serviceWorker' in navigator) {

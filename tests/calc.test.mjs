@@ -66,8 +66,8 @@ test('Mペースは予想フルマラソンタイムのペースと一致する'
   }
 });
 
-// レベル判定（js/app.js の VDOT_LEVELS）の境界は、この対応関係を前提に置いてある。
-// ここがズレると「サブ4が見えてくる」といった表示が実態とずれる。
+// レベル判定（js/app.js の VDOT_LEVELS）は、フルマラソンのタイムから vdotFromPerformance で
+// 境界を逆算している。ここがズレると「サブ4レベル」といった表示が実態とずれる。
 test('サブ4・サブ3相当のVDOTがレベル判定の境界と対応している', () => {
   assert.ok(Math.abs(vdotFromPerformance(42195, 4 * 3600) - 38) < 0.5, 'サブ4 ≈ VDOT38');
   assert.ok(Math.abs(vdotFromPerformance(42195, 3 * 3600) - 53.5) < 0.5, 'サブ3 ≈ VDOT53〜54');

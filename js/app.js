@@ -1743,37 +1743,44 @@
   // js/calc.js にあり、公開されているVDOT換算表の実測値と一致することは
   // tests/calc.test.mjs が検証している。ここにあるのは画面の組み立てだけ。
 
-  // プリセットは10km以下のレース距離のみ（ハーフ/フルは想定利用者の対象外のため入れない。
-  // 必要なら「その他」から自由入力できる）
+  // 以前はハーフ/フルを「想定利用者の対象外」として外していたが、市民ランナーが
+  // 一番よく出るレースで、レベル目安や予想タイムもフル基準で書いている。入力側だけ
+  // 「その他」で 21097 と打たせるのはちぐはぐなので入れた（2026-10-08 レビュー）
   const VDOT_PRESET_DISTANCES = [
-    { meters: 1500, label: '1500m' },
-    { meters: 1609, label: '1マイル (1609m)' },
-    { meters: 3000, label: '3000m' },
-    { meters: 5000, label: '5000m' },
-    { meters: 10000, label: '10000m' },
-  ];
-
-  // 予想タイムの対象距離（VDOTの有効範囲とされる1500m〜フルマラソンのみ）
-  const VDOT_PREDICT_DISTANCES = [
-    { meters: 1500, label: '1500m' },
-    { meters: 1609, label: '1マイル' },
-    { meters: 3000, label: '3000m' },
-    { meters: 5000, label: '5000m' },
-    { meters: 10000, label: '10000m' },
+    { meters: 1500, label: '1,500m' },
+    { meters: 1609, label: '1マイル（1,609m）' },
+    { meters: 3000, label: '3,000m' },
+    { meters: 5000, label: '5,000m' },
+    { meters: 10000, label: '10,000m' },
     { meters: 21097, label: 'ハーフマラソン' },
     { meters: 42195, label: 'フルマラソン' },
   ];
 
-  // VDOTのレベル目安。境界値は実際にvdotFromPerformance()の逆算（二分探索）で検証済み
-  // （例: サブ4=フルマラソン4時間切り相当はVDOT≈38、サブ3=3時間切り相当はVDOT≈53〜54）。
-  const VDOT_LEVELS = [
-    { max: 30, label: '初心者・健康維持レベル', desc: '5kmを30分前後で走るくらい。これから伸びる段階' },
-    { max: 38, label: '市民ランナーレベル', desc: 'フルマラソン4時間台〜5時間程度が目安' },
-    { max: 48, label: 'サブ4ペース目安のレベル', desc: 'フルマラソン4時間切り(サブ4)が見えてくる' },
-    { max: 58, label: 'サブ3ペース目安のレベル', desc: 'フルマラソン3時間切り(サブ3)が見えてくる' },
-    { max: 68, label: '上級・競技志向レベル', desc: 'フルマラソン2時間30〜50分台クラス' },
-    { max: Infinity, label: 'エリート・トップクラスレベル', desc: '国内トップ〜世界トップクラス' },
+  // 予想タイムの対象距離（VDOTの有効範囲とされる1500m〜フルマラソンのみ）
+  const VDOT_PREDICT_DISTANCES = [
+    { meters: 1500, label: '1,500m' },
+    { meters: 1609, label: '1マイル' },
+    { meters: 3000, label: '3,000m' },
+    { meters: 5000, label: '5,000m' },
+    { meters: 10000, label: '10,000m' },
+    { meters: 21097, label: 'ハーフマラソン' },
+    { meters: 42195, label: 'フルマラソン' },
   ];
+
+  // VDOTのレベル目安。境界はフルマラソンのタイムで決め、VDOTはそこから逆算する。
+  // 以前はVDOTの数字を手で置いていたため、「48〜58はサブ3」と書きながら
+  // VDOT48の予想フルが3:17、という食い違いが出ていた。説明文と境界が同じ
+  // タイムから出ていれば、片方だけ直してずれることが起きない。
+  const MARATHON_M = 42195;
+  const VDOT_LEVELS = [
+    { fullSec: 4.75 * 3600, label: '初心者・健康維持レベル', desc: '5kmで30分前後かそれ以上。ここから一番伸びる段階' },
+    { fullSec: 4 * 3600, label: '市民ランナーレベル', desc: 'フルマラソン4時間〜4時間45分が目安' },
+    { fullSec: 3.5 * 3600, label: 'サブ4レベル', desc: 'フルマラソン3時間30分〜4時間（サブ4）が目安' },
+    { fullSec: 3 * 3600, label: 'サブ3.5レベル', desc: 'フルマラソン3時間〜3時間30分（サブ3.5）が目安' },
+    { fullSec: 2.5 * 3600, label: 'サブ3レベル', desc: 'フルマラソン2時間30分〜3時間（サブ3）が目安' },
+    { fullSec: 2.25 * 3600, label: '競技者レベル', desc: 'フルマラソン2時間15〜30分。大会で上位を争う水準' },
+    { fullSec: null, label: 'エリートレベル', desc: 'フルマラソン2時間15分切り。実業団〜トップ選手の水準' },
+  ].map((l) => ({ ...l, max: l.fullSec === null ? Infinity : vdotFromPerformance(MARATHON_M, l.fullSec) }));
   const VDOT_GAUGE_MIN = 20;
   const VDOT_GAUGE_MAX = 75;
   // 計算式が実測値と一致することを確認済みの範囲（1500m〜フルマラソン）。

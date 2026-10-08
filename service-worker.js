@@ -63,16 +63,21 @@ self.addEventListener('fetch', (event) => {
   const { request } = event;
   if (request.method !== 'GET') return;
 
+  // ページを開くリクエストは、共有リンクの ?pace=4:30 などを外したURLでキャッシュする。
+  // そのままだと共有リンクを開くたびにキャッシュの項目が増え、オフラインでは
+  // 初めてのリンクが当たらない（中身はクエリに関係なく同じ index.html）
+  const cacheKey = request.mode === 'navigate' ? new URL(request.url).pathname : request;
+
   event.respondWith(
     (async () => {
       const cache = await caches.open(CACHE_NAME);
-      const cached = await cache.match(request, { ignoreSearch: false });
+      const cached = await cache.match(cacheKey, { ignoreSearch: false });
 
       // stale-while-revalidate: あればすぐ返しつつ、裏で最新版を取りに行ってキャッシュを更新する
       const networkFetch = fetch(request)
         .then((response) => {
           if (response && (response.ok || response.type === 'opaque')) {
-            cache.put(request, response.clone());
+            cache.put(cacheKey, response.clone());
           }
           return response;
         })

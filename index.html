@@ -142,7 +142,7 @@
         <div id="pace-announcer" class="sr-only" aria-live="polite" aria-atomic="true"></div>
       </section>
 
-      <div class="mb-4 flex items-center justify-center gap-2">
+      <div class="mb-4 flex flex-wrap items-center justify-center gap-2">
         <button id="vdot-btn" type="button" class="btn-secondary">
           <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-4 h-4">
             <circle cx="12" cy="12" r="9"></circle>
@@ -150,6 +150,17 @@
             <circle cx="12" cy="12" r="0.5" fill="currentColor"></circle>
           </svg>
           トレーニングペース
+        </button>
+        <!-- 練習仲間に「今日の設定」を送る用。ペースが決まっているときだけ出す。
+             3つ並べると375px幅でもはみ出すので、これだけアイコンのみ（44px角） -->
+        <button id="share-btn" type="button" hidden class="btn-ghost w-11 h-11 !p-0" aria-label="このペースをリンクで共有" title="リンクで共有">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-4 h-4">
+            <circle cx="18" cy="5" r="3"></circle>
+            <circle cx="6" cy="12" r="3"></circle>
+            <circle cx="18" cy="19" r="3"></circle>
+            <line x1="8.59" y1="13.51" x2="15.42" y2="17.49"></line>
+            <line x1="15.41" y1="6.51" x2="8.59" y2="10.49"></line>
+          </svg>
         </button>
         <!-- 消す操作は、消すものが画面にあるときだけ出す -->
         <button id="reset-btn" type="button" hidden class="btn-ghost">
@@ -211,6 +222,7 @@
         <p class="help-body">
           ペースの下の「400m 1周」を押すと<b>周回表</b>が開き、400mトラックで何周目に何分何秒で
           通過すればよいかを一覧で確認できます（距離はメイン画面に表示している800m以上から選べます）。
+          共有ボタンを押すと、いまのペースを開いたリンクを練習仲間に送れます。
         </p>
       </section>
 

@@ -69,6 +69,7 @@
 
   const listEl = document.getElementById('distance-list');
   const resetBtn = document.getElementById('reset-btn');
+  const shareBtn = document.getElementById('share-btn');
   const themeToggleBtn = document.getElementById('theme-toggle-btn');
   const editDistancesBtn = document.getElementById('edit-distances-btn');
   const addDistanceShortcutBtn = document.getElementById('add-distance-shortcut');
@@ -187,6 +188,86 @@
     paceSource = source === 'pace' || sourceVisible ? source : 'pace';
     applyPaceToAllVisible();
     updateSourceHighlight();
+  }
+
+  // ---------- URLでの共有 ----------
+  //
+  // 練習仲間に「今日は 4'30" で」と送るとき、相手が開いた瞬間に同じ画面になるように
+  // ペースだけをURLに載せる（?pace=4:30）。距離の並びは人それぞれなので載せない。
+
+  function parseSharedPace() {
+    try {
+      const raw = new URLSearchParams(location.search).get('pace');
+      if (!raw) return null;
+      const m = /^(\d{1,3}):(\d{1,2})$/.exec(raw.trim());
+      if (!m) return null;
+      const sec = Number(m[1]) * 60 + Number(m[2]);
+      if (Number(m[2]) > 59 || sec < 1 || sec > 999 * 60) return null;
+      return sec;
+    } catch (e) {
+      return null;
+    }
+  }
+
+  // 共有リンクで開いたら、そのペースを入れてからURLからは外す（以降の自分の入力が
+  // リロードのたびに共有時の値へ巻き戻らないように）
+  function applySharedPaceFromUrl() {
+    const shared = parseSharedPace();
+    if (shared === null) return;
+    applySavedPace(shared, 'pace');
+    pendingFlash.clear();
+    updatePaceSummaryFields();
+    savePace();
+    const params = new URLSearchParams(location.search);
+    params.delete('pace');
+    const rest = params.toString();
+    history.replaceState(history.state, '', location.pathname + (rest ? `?${rest}` : '') + location.hash);
+    showToast(`共有されたペース ${formatPaceMinSec(shared)}/km を表示しています`);
+  }
+
+  async function onShareClick() {
+    if (currentPace === null || currentPace <= 0) return;
+    const sec = Math.round(currentPace);
+    const paceText = `${Math.floor(sec / 60)}:${pad2(sec % 60)}`;
+    const url = `${location.origin}${location.pathname}?pace=${paceText}`;
+    const text = `ペース ${formatPaceMinSec(sec)}/km（400m 1周 ${formatPaceMinSec(sec * 0.4)}）`;
+    if (navigator.share) {
+      try {
+        await navigator.share({ title: 'Pace Converter', text, url });
+        return;
+      } catch (e) {
+        if (e && e.name === 'AbortError') return; // 共有シートを閉じただけ
+      }
+    }
+    const payload = `${text}\n${url}`;
+    try {
+      await navigator.clipboard.writeText(payload);
+      showToast('リンクをコピーしました');
+      return;
+    } catch (e) {
+      // 権限やブラウザの都合で使えないときは、昔ながらのコピーで試す
+    }
+    if (legacyCopy(payload)) showToast('リンクをコピーしました');
+    else showToast('リンクをコピーできませんでした');
+  }
+
+  function legacyCopy(str) {
+    const ta = document.createElement('textarea');
+    ta.value = str;
+    ta.setAttribute('readonly', '');
+    ta.style.position = 'fixed';
+    ta.style.opacity = '0';
+    document.body.appendChild(ta);
+    ta.select();
+    let ok = false;
+    try {
+      ok = document.execCommand('copy');
+    } catch (e) {
+      ok = false;
+    }
+    ta.remove();
+    shareBtn.focus();
+    return ok;
   }
 
   function restorePace() {
@@ -553,6 +634,7 @@
     const hasValue = currentPace !== null;
     const hasPace = hasValue && currentPace > 0;
     resetBtn.hidden = !hasValue;
+    shareBtn.hidden = !hasPace;
     paceDerivedEl.hidden = !hasPace;
 
     if (!hasPace) {
@@ -2802,6 +2884,8 @@
     updateDerivedInfo();
 
     buildToast();
+    applySharedPaceFromUrl();
+    shareBtn.addEventListener('click', onShareClick);
     buildModal();
     editDistancesBtn.addEventListener('click', () => openView('distances', editDistancesBtn));
     addDistanceShortcutBtn.addEventListener('click', () => openView('distances', addDistanceShortcutBtn));

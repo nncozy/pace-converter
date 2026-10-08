@@ -1900,6 +1900,10 @@
   // 計算式が実測値と一致することを確認済みの範囲（1500m〜フルマラソン）。
   // 「その他」で範囲外の距離を入力すると数式は動くが、レベル判定などの結果は
   // 大きく外れうるため、そのまま鵜呑みにされないよう警告を出す
+  // 式が意味を持つVDOTの範囲。フル8時間の歩きでも約15、世界記録でも85前後なので、
+  // ここを外れるのはほぼ打ち間違い（1500mを2時間で -2.7 など）
+  const VDOT_PLAUSIBLE_MIN = 10;
+  const VDOT_PLAUSIBLE_MAX = 90;
   const VDOT_VALID_MIN_METERS = 1500;
   const VDOT_VALID_MAX_METERS = 42195;
 
@@ -2012,18 +2016,19 @@
     return (hh * 3600 + mm * 60 + ss) * 1000 + cs * 10;
   }
 
-  function updateVdotLevel(vdot, outOfRange) {
+  // blockReason を渡すと、レベル判定の代わりにその理由を出す
+  function updateVdotLevel(vdot, blockReason) {
     if (vdot === null) {
       vdotLevelLabelEl.textContent = '--';
       vdotLevelDescEl.textContent = '距離とタイムを入力すると目安が表示されます';
       vdotLevelFillEl.style.width = '0%';
       return;
     }
-    if (outOfRange) {
+    if (blockReason) {
       // 有効範囲外では「エリート」等の断定的なレベル判定を出さない
       // (100mを全力の秒数で入力すると計算上VDOTが跳ね上がるなど、誤解を招くため)
       vdotLevelLabelEl.textContent = '判定対象外';
-      vdotLevelDescEl.textContent = '有効範囲外の距離のため、レベルの目安は表示できません';
+      vdotLevelDescEl.textContent = blockReason;
       vdotLevelFillEl.style.width = '0%';
       return;
     }
@@ -2064,20 +2069,30 @@
     }
 
     const outOfRange = meters < VDOT_VALID_MIN_METERS || meters > VDOT_VALID_MAX_METERS;
-    if (outOfRange) {
+    const vdot = vdotFromPerformance(meters, totalMs / 1000);
+    // 1500mを2時間のような打ち間違いだと、VDOTがマイナスになり予想タイムは探索の
+    // 上限（30時間）に張り付く。式が意味を持つ範囲を外れたら、数字を並べずに知らせる
+    const implausible = !Number.isFinite(vdot) || vdot < VDOT_PLAUSIBLE_MIN || vdot > VDOT_PLAUSIBLE_MAX;
+
+    if (implausible) {
+      vdotRangeWarningEl.textContent =
+        '距離とタイムの組み合わせが計算式の想定から大きく外れています。打ち間違いがないか確認してください。';
+    } else if (outOfRange) {
       vdotRangeWarningEl.textContent =
         `距離が有効範囲(${VDOT_VALID_MIN_METERS.toLocaleString('ja-JP')}m〜フルマラソン)外です。計算結果は参考程度に見てください。`;
     }
-    vdotRangeWarningEl.classList.toggle('hidden', !outOfRange);
+    vdotRangeWarningEl.classList.toggle('hidden', !outOfRange && !implausible);
 
-    const vdot = vdotFromPerformance(meters, totalMs / 1000);
-    vdotResultEl.textContent = vdot.toFixed(1);
+    vdotResultEl.textContent = Number.isFinite(vdot) ? vdot.toFixed(1) : '--';
+    const usableVdot = implausible ? null : vdot;
     TRAINING_ZONES.forEach((z, i) => {
-      zonePaceEls[i].textContent = formatPaceSecPerKm(zonePaceSecPerKm(vdot, z.key));
+      zonePaceEls[i].textContent = usableVdot === null ? '--\'--"' : formatPaceSecPerKm(zonePaceSecPerKm(vdot, z.key));
     });
-    updateZoneLaps(vdot);
-    updateVdotLevel(vdot, outOfRange);
-    updateVdotPredictions(vdot);
+    updateZoneLaps(usableVdot);
+    if (implausible) updateVdotLevel(vdot, '計算式の想定外の値のため、レベルの目安は表示できません');
+    else if (outOfRange) updateVdotLevel(vdot, '有効範囲外の距離のため、レベルの目安は表示できません');
+    else updateVdotLevel(vdot, null);
+    updateVdotPredictions(usableVdot);
     saveVdotRace(meters, totalMs);
   }
 

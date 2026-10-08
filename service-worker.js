@@ -3,7 +3,7 @@
 // Service Worker側の版はこの1箇所だけ。index.html の ?v=N と必ず同じ値にすること。
 // ズレると、Service Workerだけが古いキャッシュを配り続けて更新が届かなくなる。
 // 手で書き換えず `node tools/version.mjs bump` を使う（ズレは npm test で検出される）。
-const ASSET_VERSION = 22;
+const ASSET_VERSION = 23;
 const CACHE_NAME = `pace-converter-v${ASSET_VERSION}`;
 
 // ?v=N 付きで読み込んでいるファイル。index.html 側の記述と対になっている。

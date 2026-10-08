@@ -214,10 +214,21 @@
   function applySharedPaceFromUrl() {
     const shared = parseSharedPace();
     if (shared === null) return;
+    // ペースが入ると初回案内は「使い方が分かった」として閉じるが、共有リンクで
+    // 初めて来た人は自分では何も入力していない。案内はそのまま残す
+    const introWasShown = !introEl.hidden;
     applySavedPace(shared, 'pace');
     pendingFlash.clear();
     updatePaceSummaryFields();
     savePace();
+    if (introWasShown) {
+      introEl.hidden = false;
+      try {
+        localStorage.removeItem(STORAGE_KEYS.introDismissed);
+      } catch (e) {
+        // 消せなくても次回案内が出ないだけ
+      }
+    }
     const params = new URLSearchParams(location.search);
     params.delete('pace');
     const rest = params.toString();

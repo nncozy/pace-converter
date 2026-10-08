@@ -7,6 +7,7 @@
     vdotRace: 'paceConverter.vdotRace.v1',
     introDismissed: 'paceConverter.introDismissed.v1',
     swipeCoachDismissed: 'paceConverter.swipeCoachDismissed.v1',
+    pace: 'paceConverter.pace.v1',
   };
 
   const DEFAULT_METERS = [50, 200, 400, 800, 1000, 1500, 3000, 5000, 10000];
@@ -143,6 +144,48 @@
     } catch (e) {
       // 保存できなくても、その場でのアプリ利用自体は継続させる
     }
+  }
+
+  // ---------- 入力中のペースの永続化 ----------
+  //
+  // トラックで走る前に入れたペースが、アプリの開き直しやService Worker更新時の
+  // 自動リロードで消えると、練習の合間にもう一度打ち直すことになる。基準の
+  // 距離ごと覚えておき、開いたときに同じ画面に戻す。
+
+  function savePace() {
+    try {
+      if (currentPace === null) localStorage.removeItem(STORAGE_KEYS.pace);
+      else localStorage.setItem(STORAGE_KEYS.pace, JSON.stringify({ pace: currentPace, source: paceSource }));
+    } catch (e) {
+      // 保存できなくても、その場での利用は続けられる
+    }
+  }
+
+  function loadPace() {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEYS.pace);
+      if (!raw) return null;
+      const { pace, source } = JSON.parse(raw);
+      // 1km 1秒〜999分の範囲外は壊れたデータとして捨てる
+      if (!Number.isFinite(pace) || pace < 1 || pace > 999 * 60) return null;
+      if (source !== 'pace' && !Number.isInteger(source)) return null;
+      return { pace, source };
+    } catch (e) {
+      return null;
+    }
+  }
+
+  function restorePace() {
+    const saved = loadPace();
+    if (!saved) return;
+    currentPace = saved.pace;
+    // 基準だった距離が非表示・削除されていたら、ペース欄を基準として扱う
+    const sourceVisible = visibleDistances().some(({ meters }) => meters === saved.source);
+    paceSource = saved.source === 'pace' || sourceVisible ? saved.source : 'pace';
+    applyPaceToAllVisible();
+    // 「書き換わった」合図は入力に反応したときのためのもの。開いた瞬間に全欄を光らせない
+    pendingFlash.clear();
+    updateSourceHighlight();
   }
 
   function sortedDistances() {
@@ -533,6 +576,7 @@
     updateSourceHighlight();
     applyPaceToAllVisible();
     updateDerivedInfo();
+    savePace();
   }
 
   function onPaceSummaryInput(e) {
@@ -778,6 +822,7 @@
       setFieldValue(meters, 'cs', cs);
     });
     updateAllUnitVisibility();
+    savePace();
   }
 
   // 現在のペースを、表示中の全距離の欄に反映する（距離の追加・表示切替の直後に使用）。
@@ -882,6 +927,7 @@
     });
     updateAllUnitVisibility();
     updateDerivedInfo();
+    savePace();
   }
 
   function resetAll() {
@@ -2440,6 +2486,7 @@
 
   function init() {
     renderCards();
+    restorePace();
     updatePaceSummaryFields();
     listEl.addEventListener('input', onInput);
     listEl.addEventListener('keydown', onKeydown);

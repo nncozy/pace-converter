@@ -246,12 +246,12 @@
       <section>
         <h2 class="help-heading">保存されるもの</h2>
         <p class="help-body">
-          表示している距離・並び順・ピン留め・テーマ・VDOTのレース結果は、この端末のブラウザ
-          （<code>localStorage</code>）にだけ保存されます。サーバーには何も送信していないため、
-          別のブラウザや端末には引き継がれません。
+          最後に入力したペース・表示している距離・並び順・ピン留め・テーマ・VDOTのレース結果は、
+          この端末のブラウザにだけ保存されます。アプリを閉じて開き直しても、入力したペースはそのまま残ります。
+          サーバーには何も送信していないため、別のブラウザや端末には引き継がれません。
         </p>
         <p class="help-body">
-          一度開けば、電波の届かない場所でもアプリを起動できます（Service Workerによるオフライン対応）。
+          一度開けば、電波の届かない場所でもアプリを起動できます。
         </p>
       </section>
     </div>
@@ -274,10 +274,13 @@
       });
 
       // 新しいService Workerが有効になったら、表示中の内容を最新にするため
-      // 一度だけ再読み込みする(でないと更新に気づいてもらえない)
+      // 一度だけ再読み込みする(でないと更新に気づいてもらえない)。
+      // 初回訪問ではService Workerの登録（clients.claim）でも controllerchange が
+      // 飛ぶが、そのときは表示中の内容がすでに最新なので読み込み直さない
+      const hadController = !!navigator.serviceWorker.controller;
       let refreshingForUpdate = false;
       navigator.serviceWorker.addEventListener('controllerchange', () => {
-        if (refreshingForUpdate) return;
+        if (!hadController || refreshingForUpdate) return;
         refreshingForUpdate = true;
         window.location.reload();
       });

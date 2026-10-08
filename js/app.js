@@ -611,7 +611,7 @@
   function onPaceSummaryInput(e) {
     const input = e.target;
     const maxLen = input === paceMinInput ? 3 : 2;
-    let digits = input.value.replace(/[^0-9]/g, '');
+    let digits = toDigits(input.value);
     if (digits.length > maxLen) digits = digits.slice(0, maxLen);
     if (digits !== input.value) input.value = digits;
 
@@ -749,11 +749,11 @@
         stack.className = 'flex flex-col items-center';
 
         const input = document.createElement('input');
-        input.type = 'number';
+        // number型だと iOS Safari で select() が効かず、計算済みの欄に打ち直すと
+        // 新しい数字が末尾に付いて切り捨てられる。text型＋inputmodeで数字キーボードを出す
+        input.type = 'text';
         input.inputMode = 'numeric';
         input.pattern = '[0-9]*';
-        input.min = '0';
-        input.max = String(UNIT_MAX[unit]);
         // "00"だと未入力なのか実際に0が入っているのか見分けがつかないため、
         // 上部のペースサマリー欄と同じく"--"を使う
         input.placeholder = '--';
@@ -875,6 +875,11 @@
     updateAllUnitVisibility();
   }
 
+  // 入力から数字だけを取り出す。日本語入力で全角数字が入っても受け付ける
+  function toDigits(str) {
+    return str.replace(/[０-９]/g, (c) => String.fromCharCode(c.charCodeAt(0) - 0xfee0)).replace(/[^0-9]/g, '');
+  }
+
   function clampUnitValue(unit, value) {
     if (Number.isNaN(value)) return 0;
     return Math.min(Math.max(value, 0), UNIT_MAX[unit]);
@@ -887,7 +892,7 @@
     const unit = input.dataset.unit;
 
     // 数字以外を除去し、2桁で切り詰める
-    let digits = input.value.replace(/[^0-9]/g, '');
+    let digits = toDigits(input.value);
     if (digits.length > 2) digits = digits.slice(0, 2);
     if (digits !== input.value) input.value = digits;
 
@@ -2123,7 +2128,7 @@
   function onVdotTimeInput(e) {
     const input = e.target;
     if (!input.classList.contains('vdot-time-input')) return;
-    let digits = input.value.replace(/[^0-9]/g, '');
+    let digits = toDigits(input.value);
     if (digits.length > 2) digits = digits.slice(0, 2);
     if (digits !== input.value) input.value = digits;
 
@@ -2199,16 +2204,16 @@
 
         <span class="block text-xs font-semibold text-neutral-500 dark:text-neutral-400 mb-1 mt-2">タイム</span>
         <div class="flex items-center justify-center gap-0.5">
-          <input id="vdot-hh-input" type="number" inputmode="numeric" pattern="[0-9]*" min="0" max="99" placeholder="--" autocomplete="off" aria-label="時"
+          <input id="vdot-hh-input" type="text" inputmode="numeric" pattern="[0-9]*" placeholder="--" autocomplete="off" aria-label="時"
             class="vdot-time-input w-12 bg-neutral-200 dark:bg-neutral-800 rounded-xl text-center text-lg font-mono py-2 focus:outline-none focus:ring-2 focus:ring-lime-600 dark:focus:ring-lime-400 text-neutral-900 dark:text-white transition-shadow" data-vdot-unit="hh">
           <span class="text-neutral-400 dark:text-neutral-500 font-mono text-lg px-0.5">:</span>
-          <input id="vdot-mm-input" type="number" inputmode="numeric" pattern="[0-9]*" min="0" max="59" placeholder="--" autocomplete="off" aria-label="分"
+          <input id="vdot-mm-input" type="text" inputmode="numeric" pattern="[0-9]*" placeholder="--" autocomplete="off" aria-label="分"
             class="vdot-time-input w-12 bg-neutral-200 dark:bg-neutral-800 rounded-xl text-center text-lg font-mono py-2 focus:outline-none focus:ring-2 focus:ring-lime-600 dark:focus:ring-lime-400 text-neutral-900 dark:text-white transition-shadow" data-vdot-unit="mm">
           <span class="text-neutral-400 dark:text-neutral-500 font-mono text-lg px-0.5">:</span>
-          <input id="vdot-ss-input" type="number" inputmode="numeric" pattern="[0-9]*" min="0" max="59" placeholder="--" autocomplete="off" aria-label="秒"
+          <input id="vdot-ss-input" type="text" inputmode="numeric" pattern="[0-9]*" placeholder="--" autocomplete="off" aria-label="秒"
             class="vdot-time-input w-12 bg-neutral-200 dark:bg-neutral-800 rounded-xl text-center text-lg font-mono py-2 focus:outline-none focus:ring-2 focus:ring-lime-600 dark:focus:ring-lime-400 text-neutral-900 dark:text-white transition-shadow" data-vdot-unit="ss">
           <span class="text-neutral-400 dark:text-neutral-500 font-mono text-lg px-0.5">.</span>
-          <input id="vdot-cs-input" type="number" inputmode="numeric" pattern="[0-9]*" min="0" max="99" placeholder="--" autocomplete="off" aria-label="100分の1秒"
+          <input id="vdot-cs-input" type="text" inputmode="numeric" pattern="[0-9]*" placeholder="--" autocomplete="off" aria-label="100分の1秒"
             class="vdot-time-input w-12 bg-neutral-200 dark:bg-neutral-800 rounded-xl text-center text-lg font-mono py-2 focus:outline-none focus:ring-2 focus:ring-lime-600 dark:focus:ring-lime-400 text-neutral-900 dark:text-white transition-shadow" data-vdot-unit="cs">
         </div>
         <div class="flex justify-center gap-0.5 mt-1 text-[10px] text-neutral-500 dark:text-neutral-400 font-mono">

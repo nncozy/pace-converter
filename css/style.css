@@ -162,15 +162,8 @@ html.dark .derived-chip b {
 
 /* ---------- ペースのヒーロー入力 ---------- */
 
-/* Remove number input spinners for a cleaner, running-watch-like look */
-.pace-input::-webkit-outer-spin-button,
-.pace-input::-webkit-inner-spin-button {
-  -webkit-appearance: none;
-  margin: 0;
-}
+/* 時間の入力欄は type="text" + inputmode="numeric"（number型は iOS で select() が効かないため） */
 .pace-input {
-  -moz-appearance: textfield;
-  appearance: textfield;
   font-variant-numeric: tabular-nums;
   caret-color: #65a30d; /* lime-600, light mode */
 }
@@ -191,15 +184,7 @@ html.dark .pace-input:focus {
   touch-action: pan-y;
 }
 
-/* Pace summary (min/sec) inputs share the same numeric-field treatment */
-.pace-summary-input::-webkit-outer-spin-button,
-.pace-summary-input::-webkit-inner-spin-button {
-  -webkit-appearance: none;
-  margin: 0;
-}
 .pace-summary-input {
-  -moz-appearance: textfield;
-  appearance: textfield;
   -webkit-tap-highlight-color: transparent;
   touch-action: manipulation;
   caret-color: currentColor;
@@ -503,15 +488,7 @@ html.dark .preset-chip[aria-pressed='true'] {
   color: #bef264;
 }
 
-/* VDOT modal time-input fields share the pace-input numeric-field treatment */
-.vdot-time-input::-webkit-outer-spin-button,
-.vdot-time-input::-webkit-inner-spin-button {
-  -webkit-appearance: none;
-  margin: 0;
-}
 .vdot-time-input {
-  -moz-appearance: textfield;
-  appearance: textfield;
   font-variant-numeric: tabular-nums;
   -webkit-tap-highlight-color: transparent;
   touch-action: manipulation;

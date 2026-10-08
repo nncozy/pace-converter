@@ -25,9 +25,12 @@
     zonePaceSecPerKm,
   } = window.PaceCalc;
 
-  // 表示順: 時・分・秒・ミリ秒(2桁=センチ秒)
+  // 表示順: 時・分・秒・1/100秒(2桁=センチ秒)
   const UNITS = ['hh', 'mm', 'ss', 'cs'];
-  const UNIT_LABEL = { hh: '時', mm: '分', ss: '秒', cs: 'ms' };
+  // 最後の欄は2桁の1/100秒。以前は「ms」と書いていたが、msはミリ秒（1/1000秒）の
+  // 略なので、「12秒34」をどう入れるか迷わせていた
+  const UNIT_LABEL = { hh: '時', mm: '分', ss: '秒', cs: '1/100' };
+  const UNIT_ARIA_LABEL = { hh: '時', mm: '分', ss: '秒', cs: '100分の1秒' };
   const SEPARATOR = { hh: ':', mm: ':', ss: '.', cs: '' };
 
   const SUN_ICON = `
@@ -252,13 +255,13 @@
 
   // ---------- 距離ごとに必要な桁だけを出す ----------
   //
-  // 全距離に hh/mm/ss/cs の4欄を常設すると、50mの「時」やフルマラソンの「ms」の
+  // 全距離に hh/mm/ss/cs の4欄を常設すると、50mの「時」やフルマラソンの「1/100秒」の
   // ように、まず0以外にならない欄がタップ目標の間に挟まって精度と一覧性を落とす。
   // 「時」の常設は5000mから。5000mを1時間超で走る（歩く）ことは実際にあるので、
   // ここを上げすぎると直接入力で59分の壁に当たって詰む。逆に3000m以下では
   // 1時間を超えることがないので、常に0の欄を挟まない。
   const HOUR_FIELD_MIN_METERS = 5000; // これ以上なら「時」を常設する
-  const CENTI_FIELD_MAX_METERS = 3000; // これ以下なら「ms」を常設する
+  const CENTI_FIELD_MAX_METERS = 3000; // これ以下なら「1/100秒」を常設する
 
   function unitAlwaysVisible(unit, meters) {
     if (unit === 'hh') return meters >= HOUR_FIELD_MIN_METERS;
@@ -268,6 +271,13 @@
 
   // 常設対象でない欄も、0以外の値が入った時点で必ず出す。値があるのに隠すと
   // 「入力が消えた」ように見えるうえ、合計タイムの読み方まで嘘になる。
+  // 計算結果としてカードに出すタイム。1/100秒の欄を常設しない距離（3,000m超）では
+  // 秒単位に丸める。丸めないとフルマラソンが 3:30:58.50 のように出て、普段は
+  // 畳んでいる欄が計算のたびに現れたり消えたりする（カード幅も変わる）
+  function displayMs(meters, ms) {
+    return unitAlwaysVisible('cs', meters) ? ms : Math.round(ms / 1000) * 1000;
+  }
+
   function updateUnitVisibility(meters) {
     const card = listEl.querySelector(`.distance-card[data-distance="${meters}"]`);
     if (!card) return;
@@ -675,7 +685,7 @@
         // 上部のペースサマリー欄と同じく"--"を使う
         input.placeholder = '--';
         input.autocomplete = 'off';
-        input.setAttribute('aria-label', `${meters}m ${UNIT_LABEL[unit]}`);
+        input.setAttribute('aria-label', `${meters}m ${UNIT_ARIA_LABEL[unit]}`);
         input.className =
           'pace-input w-14 bg-neutral-200 dark:bg-neutral-800 rounded-xl text-center text-xl font-mono py-2 ' +
           'focus:outline-none focus:ring-2 focus:ring-lime-600 dark:focus:ring-lime-400 text-neutral-900 dark:text-white transition-shadow';
@@ -761,7 +771,7 @@
 
     visibleDistances().forEach(({ meters }) => {
       if (meters === sourceDistance) return;
-      const { hh, mm, ss, cs } = msToFields(pace * meters);
+      const { hh, mm, ss, cs } = msToFields(displayMs(meters, pace * meters));
       setFieldValue(meters, 'hh', hh);
       setFieldValue(meters, 'mm', mm);
       setFieldValue(meters, 'ss', ss);
@@ -782,7 +792,7 @@
         : null;
     visibleDistances().forEach(({ meters }) => {
       if (meters === editingDistance) return;
-      const { hh, mm, ss, cs } = msToFields(currentPace * meters);
+      const { hh, mm, ss, cs } = msToFields(displayMs(meters, currentPace * meters));
       setFieldValue(meters, 'hh', hh);
       setFieldValue(meters, 'mm', mm);
       setFieldValue(meters, 'ss', ss);
@@ -2050,14 +2060,14 @@
           <input id="vdot-ss-input" type="number" inputmode="numeric" pattern="[0-9]*" min="0" max="59" placeholder="--" autocomplete="off" aria-label="秒"
             class="vdot-time-input w-12 bg-neutral-200 dark:bg-neutral-800 rounded-xl text-center text-lg font-mono py-2 focus:outline-none focus:ring-2 focus:ring-lime-600 dark:focus:ring-lime-400 text-neutral-900 dark:text-white transition-shadow" data-vdot-unit="ss">
           <span class="text-neutral-400 dark:text-neutral-500 font-mono text-lg px-0.5">.</span>
-          <input id="vdot-cs-input" type="number" inputmode="numeric" pattern="[0-9]*" min="0" max="99" placeholder="--" autocomplete="off" aria-label="ミリ秒"
+          <input id="vdot-cs-input" type="number" inputmode="numeric" pattern="[0-9]*" min="0" max="99" placeholder="--" autocomplete="off" aria-label="100分の1秒"
             class="vdot-time-input w-12 bg-neutral-200 dark:bg-neutral-800 rounded-xl text-center text-lg font-mono py-2 focus:outline-none focus:ring-2 focus:ring-lime-600 dark:focus:ring-lime-400 text-neutral-900 dark:text-white transition-shadow" data-vdot-unit="cs">
         </div>
         <div class="flex justify-center gap-0.5 mt-1 text-[10px] text-neutral-400 dark:text-neutral-600 font-mono">
           <span class="w-12 text-center">時</span><span class="w-3"></span>
           <span class="w-12 text-center">分</span><span class="w-3"></span>
           <span class="w-12 text-center">秒</span><span class="w-3"></span>
-          <span class="w-12 text-center">ms</span>
+          <span class="w-12 text-center">1/100</span>
         </div>
       </section>
 

@@ -1849,36 +1849,44 @@
     return VDOT_LEVELS.find((l) => vdot < l.max) || VDOT_LEVELS[VDOT_LEVELS.length - 1];
   }
 
+  // laps はトラックで使う1本あたりの距離。Danielsの表もT/Iは400m・1000m、
+  // Rは200m・400mあたりの秒数で出している。/km だけだと、トラックでインターバルを
+  // するたびにメイン画面へ戻って打ち直すことになっていた
   const TRAINING_ZONES = [
     {
       key: 'E',
-      label: 'イージー / LSD',
-      desc: '楽に会話できるペース。有酸素の土台作り',
-      hint: '会話ができるくらい余裕のあるペース。練習の大部分（週の7〜8割くらい）はこの強度で十分です。30分〜2時間ほど、息が弾みすぎない範囲でゆっくり走りましょう。',
+      label: 'イージー（ジョグ）',
+      desc: '楽に会話できるペース。これより遅くてもOK',
+      laps: [],
+      hint: '会話ができるくらい余裕のあるペース。表示しているのは速い側の目安なので、これより遅く走って構いません。練習の大部分（週の7〜8割くらい）はこの強度で十分です。30分〜2時間ほど、息が弾みすぎない範囲で走りましょう。',
     },
     {
       key: 'M',
       label: 'マラソン',
       desc: 'フルマラソンのレースペースの目安',
-      hint: 'フルマラソンを走るときの目標ペースです。10kmまでしか出ない場合でも、「ちょっと頑張る」持続走（20〜60分ほど）の強度の目安として使えます。',
+      laps: [],
+      hint: 'フルマラソンを走るときの目標ペースです（ポテンシャルタイムのフルマラソンと同じペース）。10km以下のレースが中心の人も、「ちょっと頑張る」持続走（20〜60分ほど）の強度の目安として使えます。',
     },
     {
       key: 'T',
       label: '閾値走',
       desc: '「ややきつい」を1時間ほど保てるペース',
+      laps: [400],
       hint: 'きついけど一言二言なら会話できる強度。乳酸がたまり始める境目を押し上げる練習です。20分間走り続けるか、5〜10分の反復を短い休憩（1〜2分のジョグ）を挟んで数本行うのがおすすめ。合計20〜40分くらいが目安です。',
     },
     {
       key: 'I',
       label: 'インターバル',
       desc: 'VO2maxを鍛える高強度ペース',
+      laps: [400],
       hint: 'きついが全力ではない強度。3〜5分ほど走って、同じくらいの時間のジョグで回復、を繰り返します（例: 1000mを5本、間はジョグで2〜3分）。フォームが崩れるほど追い込まず、余裕がなくなったら本数を減らして大丈夫です。',
     },
     {
       key: 'R',
       label: 'レペティション',
-      desc: 'フォームとスピードを鍛える全力に近いペース',
-      hint: '速いフォームとスピード感を養うための短い反復走です。200〜400mほどを、しっかり休んで（反復と同じか長めのジョグ・レスト）繰り返します。追い込む練習ではないので、疲れすぎない本数に留めましょう。',
+      desc: '1,500m〜1マイルのレースペース。スピードとフォーム作り',
+      laps: [200, 400],
+      hint: '速いフォームとスピード感を養うための短い反復走です。200〜400mほどを、走った時間の2〜3倍ほどジョグや歩きでしっかり休んでから繰り返します。息が整ってから次へ行くのがポイントで、疲れすぎない本数に留めましょう。',
     },
   ];
 
@@ -1991,6 +1999,7 @@
       vdotResultEl.textContent = '--';
       vdotRangeWarningEl.classList.add('hidden');
       zonePaceEls.forEach((el) => { el.textContent = '--\'--"'; });
+      updateZoneLaps(null);
       updateVdotLevel(null);
       updateVdotPredictions(null);
       return;
@@ -2008,9 +2017,49 @@
     TRAINING_ZONES.forEach((z, i) => {
       zonePaceEls[i].textContent = formatPaceSecPerKm(zonePaceSecPerKm(vdot, z.key));
     });
+    updateZoneLaps(vdot);
     updateVdotLevel(vdot, outOfRange);
     updateVdotPredictions(vdot);
     saveVdotRace(meters, totalMs);
+  }
+
+  // 直近に計算したゾーンごとのペース(秒/km)。メイン画面へ送るときに使う
+  const lastZonePaceSec = {};
+
+  // 1本あたりのタイムは60秒未満なら 46" のように秒だけで出す（トラックでの読み方に合わせる）
+  function formatLapSec(sec) {
+    const t = Math.round(sec);
+    return t < 60 ? `${t}"` : formatPaceMinSec(t);
+  }
+
+  function updateZoneLaps(vdot) {
+    TRAINING_ZONES.forEach((z) => {
+      const pace = vdot === null ? null : zonePaceSecPerKm(vdot, z.key);
+      lastZonePaceSec[z.key] = pace;
+      trainingViewEl.querySelectorAll(`.vdot-zone-lap[data-zone="${z.key}"]`).forEach((el) => {
+        const m = Number(el.dataset.lap);
+        el.textContent = pace === null ? '' : `${m}m ${formatLapSec((pace * m) / 1000)}`;
+      });
+      const applyBtn = trainingViewEl.querySelector(`.vdot-zone-apply[data-zone="${z.key}"]`);
+      if (applyBtn) applyBtn.disabled = pace === null;
+    });
+  }
+
+  // ゾーンのペースをメイン画面のペースとして入れ、全距離のタイムで見られるようにする。
+  // 練習で使う距離（1000m・800mなど）は人によって違うので、ここで全部並べるより
+  // 本人が並べた換算画面へ送るほうが早い
+  function applyZonePace(key) {
+    const pace = lastZonePaceSec[key];
+    if (!pace) return;
+    currentPace = Math.round(pace); // ペース欄は整数秒なので、表示と計算をそろえる
+    paceSource = 'pace';
+    updateSourceHighlight();
+    applyPaceToAllVisible();
+    updatePaceSummaryFields();
+    savePace();
+    const zone = TRAINING_ZONES.find((z) => z.key === key);
+    goBack();
+    showToast(`${zone.key}（${zone.label}）のペース ${formatPaceMinSec(currentPace)}/km を入れました`);
   }
 
   function onVdotDistanceChange() {
@@ -2217,17 +2266,28 @@
           <div class="shrink-0 text-right">
             <div class="vdot-zone-pace text-sm font-mono font-bold text-neutral-900 dark:text-white" data-zone="${z.key}">--'--"</div>
             <div class="text-[9px] text-neutral-400 dark:text-neutral-600">/ km</div>
+            ${z.laps.map((m) => `<div class="vdot-zone-lap text-[11px] font-mono font-semibold text-lime-700 dark:text-lime-300 whitespace-nowrap" data-zone="${z.key}" data-lap="${m}"></div>`).join('')}
           </div>
           <svg class="vdot-zone-chevron shrink-0 w-4 h-4 text-neutral-400 dark:text-neutral-600 transition-transform" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <polyline points="6 9 12 15 18 9"></polyline>
           </svg>
         </button>
-        <div class="vdot-zone-hint hidden px-3 pb-3 text-[11px] leading-relaxed text-neutral-500 dark:text-neutral-400">${z.hint}</div>
+        <div class="vdot-zone-hint hidden px-3 pb-3 text-[11px] leading-relaxed text-neutral-500 dark:text-neutral-400">
+          <p>${z.hint}</p>
+          <button type="button" class="vdot-zone-apply mt-2 inline-flex items-center gap-1 rounded-full border border-lime-600/40 dark:border-lime-400/40 px-3 py-2 text-xs font-bold text-lime-700 dark:text-lime-300 disabled:opacity-40 disabled:cursor-not-allowed enabled:active:scale-95 transition" data-zone="${z.key}" disabled>
+            このペースで各距離のタイムを見る
+          </button>
+        </div>
       `;
       zoneListEl.appendChild(row);
     });
 
     zoneListEl.addEventListener('click', (e) => {
+      const applyBtn = e.target.closest('.vdot-zone-apply');
+      if (applyBtn) {
+        applyZonePace(applyBtn.dataset.zone);
+        return;
+      }
       const btn = e.target.closest('.vdot-zone-toggle');
       if (!btn) return;
       const expanded = btn.getAttribute('aria-expanded') === 'true';
@@ -2392,7 +2452,6 @@
   const HEADER_HEIGHT_PX = 64;
   const KNOWN_ROUTES = ['training', 'help', 'distances'];
 
-  let openedInApp = false; // 直前の履歴が自分のものか（=history.back()で戻れるか）
   let viewReturnFocus = null;
   let mainScrollY = 0;
   let lastBaseView = null;
@@ -2404,14 +2463,22 @@
 
   // triggerEl は戻ってきたときにフォーカスを返す先。タップだと activeElement が
   // body のままの環境があるので、呼び出し側から明示的に渡す。
+  // アプリ内で積んだ履歴の深さ。履歴エントリごとに state に持たせるので、端末の戻る
+  // ジェスチャで戻っても正しい値に戻る。以前は「アプリ内で開いたか」を真偽値1つで
+  // 持っていたため、共有URLで #training を直接開く → 使い方 → ← ← と進むと、
+  // 2回目の ← が history.back() で共有元のページへ抜けようとしていた
+  function inAppDepth() {
+    return (history.state && history.state.inAppDepth) || 0;
+  }
+
   function openView(name, triggerEl) {
     viewReturnFocus = triggerEl || document.activeElement;
-    openedInApp = true;
-    location.hash = name;
+    history.pushState({ inAppDepth: inAppDepth() + 1 }, '', `#${name}`);
+    applyRoute();
   }
 
   function goBack() {
-    if (openedInApp) {
+    if (inAppDepth() > 0) {
       history.back();
       return;
     }
@@ -2452,7 +2519,6 @@
         // サブ画面の間はヒーローが非表示なので、監視側は「画面外」のまま止まっている。
         // 監視の次の通知を待つと、戻った直後の1フレームだけヘッダーにペースが出てしまう。
         heroOffScreen = paceHeroEl.getBoundingClientRect().bottom < HEADER_HEIGHT_PX;
-        openedInApp = false;
         if (viewReturnFocus && document.contains(viewReturnFocus)) viewReturnFocus.focus();
         viewReturnFocus = null;
       } else {

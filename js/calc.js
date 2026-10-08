@@ -139,6 +139,25 @@
     return trainingPaceSecPerKm(vdot, ZONE_PCT[key]);
   }
 
+  // ---------- 周回 ----------
+
+  // トラックを lapMeters ごとに区切ったときの通過地点(m)。remainderFirst なら、
+  // 半端な距離（5000mを400mで割った余りの200m）を最初に走る。トラックレースの
+  // スタート位置と同じで、最後の周をフィニッシュラインで終える形になる
+  function lapSplitPoints(distance, lapMeters, remainderFirst) {
+    const full = Math.floor(distance / lapMeters);
+    const rem = distance - full * lapMeters;
+    const points = [];
+    if (remainderFirst && rem > 0) {
+      points.push(rem);
+      for (let k = 1; k <= full; k++) points.push(rem + k * lapMeters);
+    } else {
+      for (let k = 1; k <= full; k++) points.push(k * lapMeters);
+      if (rem > 0) points.push(distance);
+    }
+    return points;
+  }
+
   return {
     UNIT_MAX,
     pad2,
@@ -154,5 +173,6 @@
     trainingPaceSecPerKm,
     zonePaceSecPerKm,
     ZONE_PCT,
+    lapSplitPoints,
   };
 });

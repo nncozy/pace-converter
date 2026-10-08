@@ -23,6 +23,7 @@ const {
   vdotFromPerformance,
   predictRaceTimeSec,
   zonePaceSecPerKm,
+  lapSplitPoints,
 } = calc;
 
 const zonePace = (vdot, key) => formatPaceSecPerKm(zonePaceSecPerKm(vdot, key));
@@ -152,4 +153,24 @@ test('ペースとタイムの表示形式', () => {
   assert.equal(formatDurationSec(3725), '1:02:05');
   assert.equal(formatPaceSecPerKm(null), `--'--"`, '計算できないときは空欄と同じ見た目');
   assert.equal(formatPaceSecPerKm(NaN), `--'--"`);
+});
+
+// ---------- 周回表 ----------
+
+test('周回の通過地点: 割り切れる距離は400mごと', () => {
+  const p = lapSplitPoints(10000, 400, false);
+  assert.equal(p.length, 25);
+  assert.equal(p[0], 400);
+  assert.equal(p[24], 10000);
+  // 半端がないときは「最初に走る」を選んでも同じ
+  assert.deepEqual(lapSplitPoints(10000, 400, true), p);
+});
+
+test('周回の通過地点: 半端は最後、または最初（レースのスタート位置）', () => {
+  assert.deepEqual(lapSplitPoints(1000, 400, false), [400, 800, 1000]);
+  assert.deepEqual(lapSplitPoints(1000, 400, true), [200, 600, 1000]);
+  const race5k = lapSplitPoints(5000, 400, true);
+  assert.equal(race5k[0], 200);
+  assert.equal(race5k.length, 13);
+  assert.equal(race5k[race5k.length - 1], 5000);
 });

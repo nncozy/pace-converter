@@ -8,6 +8,7 @@
     introDismissed: 'paceConverter.introDismissed.v1',
     swipeCoachDismissed: 'paceConverter.swipeCoachDismissed.v1',
     pace: 'paceConverter.pace.v1',
+    lapDistance: 'paceConverter.lapDistance.v1',
   };
 
   const DEFAULT_METERS = [50, 200, 400, 800, 1000, 1500, 3000, 5000, 10000];
@@ -24,6 +25,7 @@
     vdotFromPerformance,
     predictRaceTimeSec,
     zonePaceSecPerKm,
+    lapSplitPoints,
   } = window.PaceCalc;
 
   // 表示順: 時・分・秒・1/100秒(2桁=センチ秒)
@@ -88,6 +90,7 @@
   const helpBtn = document.getElementById('help-btn');
   const mainViewEl = document.getElementById('view-main');
   const helpViewEl = document.getElementById('view-help');
+  const lapsViewEl = document.getElementById('view-laps');
 
   // 現在の基準ペース（ms/m）。未入力なら null。
   let currentPace = null;
@@ -558,7 +561,9 @@
     } else {
       const perKmSec = currentPace; // s/km == ms/m
       paceDerivedEl.innerHTML = [
-        `<span class="derived-chip">400m 1周 <b>${formatPaceMinSec(perKmSec * 0.4)}</b></span>`,
+        // 1周のタイムから周回表へ。トラックで「何周目に何分何秒」を見るのが作った動機なので、
+        // 一番目に入る場所から1タップで行けるようにする
+        `<button type="button" class="derived-chip derived-chip-link hit-44 relative" data-open-laps aria-label="400m 1周 ${formatPaceMinSec(perKmSec * 0.4)}。周回表を開く">400m 1周 <b>${formatPaceMinSec(perKmSec * 0.4)}</b><span aria-hidden="true" class="derived-chip-arrow">›</span></button>`,
         `<span class="derived-chip">1マイル <b>${formatPaceMinSec(perKmSec * 1.609344)}</b></span>`,
         `<span class="derived-chip">時速 <b>${(3600 / perKmSec).toFixed(1)}</b> km</span>`,
       ].join('');
@@ -2520,10 +2525,137 @@
   // テーマ確定のインラインスクリプトも全ファイルに複製することになる。
   // 代わりにハッシュで画面を切り替え、端末の「戻る」とURL共有だけは本物にする。
 
-  const VIEW_TITLES = { training: 'トレーニングペース', help: '使い方' };
+  // ---------- 周回表 ----------
+  //
+  // 400mトラックで「この距離をこのペースで走るなら、何周目に何分何秒で通過するか」。
+  // 換算画面の「400m 1周」だけだと、10000mなら25周ぶんの累積を頭で足すことになる。
+  // 距離はメイン画面に表示中の800m以上から選ぶ（本人が並べた距離＝実際に走る距離のため）。
+
+  const LAP_METERS = 400;
+  const LAP_MIN_DISTANCE = 800;
+  let lapRemainderFirst = false;
+
+  function loadLapDistance() {
+    try {
+      const v = Number(localStorage.getItem(STORAGE_KEYS.lapDistance));
+      return Number.isInteger(v) && v > 0 ? v : null;
+    } catch (e) {
+      return null;
+    }
+  }
+
+  function saveLapDistance(meters) {
+    try {
+      localStorage.setItem(STORAGE_KEYS.lapDistance, String(meters));
+    } catch (e) {
+      // 覚えられなくても表は出せる
+    }
+  }
+
+  function lapCandidates() {
+    return visibleDistances().map(({ meters }) => meters).filter((m) => m >= LAP_MIN_DISTANCE);
+  }
+
+  // 前回選んだ距離 → 10000m → 一番長い距離、の順で決める
+  function selectedLapDistance(candidates) {
+    const saved = loadLapDistance();
+    if (saved && candidates.includes(saved)) return saved;
+    if (candidates.includes(10000)) return 10000;
+    return candidates[candidates.length - 1];
+  }
+
+  function renderLapsView() {
+    if (currentPace === null || currentPace <= 0) {
+      lapsViewEl.innerHTML = `
+        <p class="text-sm text-neutral-600 dark:text-neutral-300 leading-relaxed">
+          ペースを入力すると、400mトラックで何周目に何分何秒で通過するかを一覧で表示します。
+        </p>
+        <button type="button" data-laps-back class="mt-4 rounded-full border border-lime-600/40 dark:border-lime-400/40 px-4 py-2 text-sm font-bold text-lime-700 dark:text-lime-300">ペースを入力する</button>`;
+      return;
+    }
+    const candidates = lapCandidates();
+    if (candidates.length === 0) {
+      lapsViewEl.innerHTML = `
+        <p class="text-sm text-neutral-600 dark:text-neutral-300 leading-relaxed">
+          ${LAP_MIN_DISTANCE.toLocaleString('ja-JP')}m以上の距離がメイン画面に表示されていません。「距離を追加・編集」で表示すると、ここで選べるようになります。
+        </p>`;
+      return;
+    }
+    const distance = selectedLapDistance(candidates);
+    const paceSecPerM = currentPace / 1000; // currentPace は s/km（= ms/m）
+    const rem = distance % LAP_METERS;
+    const points = lapSplitPoints(distance, LAP_METERS, lapRemainderFirst);
+    const rows = points.map((m, i) => {
+      const isLast = i === points.length - 1;
+      const isPartial = lapRemainderFirst ? i === 0 && rem > 0 : isLast && rem > 0;
+      let label;
+      if (lapRemainderFirst && rem > 0) label = i === 0 ? 'スタート' : `${i}周`;
+      else label = isPartial ? 'ゴール' : `${i + 1}周`;
+      return `
+        <tr class="${isLast ? 'font-bold' : ''} border-t border-neutral-200/70 dark:border-neutral-800">
+          <th scope="row" class="py-2 pr-2 text-left font-semibold text-neutral-700 dark:text-neutral-300">${label}</th>
+          <td class="py-2 pr-2 text-right text-neutral-500 dark:text-neutral-400 font-mono tabular-nums">${m.toLocaleString('ja-JP')}m${isPartial && !lapRemainderFirst ? `<span class="text-[10px]">（+${rem}m）</span>` : ''}</td>
+          <td class="py-2 text-right font-mono tabular-nums text-neutral-900 dark:text-white">${formatDurationSec(paceSecPerM * m)}</td>
+        </tr>`;
+    }).join('');
+
+    lapsViewEl.innerHTML = `
+      <div class="text-center">
+        <p class="text-xs text-neutral-500 dark:text-neutral-400">ペース <b class="font-mono text-neutral-900 dark:text-white">${formatPaceMinSec(currentPace)}</b>/km ・ 1周(400m) <b class="font-mono text-lime-700 dark:text-lime-300">${formatPaceMinSec(paceSecPerM * LAP_METERS)}</b></p>
+      </div>
+      <div class="mt-3 flex flex-wrap justify-center gap-1.5" role="group" aria-label="距離を選ぶ">
+        ${candidates.map((m) => `
+          <button type="button" data-lap-distance="${m}" aria-pressed="${m === distance}"
+            class="rounded-full border px-3 py-1.5 text-xs font-bold ${m === distance
+              ? 'border-lime-600 dark:border-lime-400 bg-lime-600/10 dark:bg-lime-400/10 text-lime-700 dark:text-lime-300'
+              : 'border-neutral-300 dark:border-neutral-700 text-neutral-600 dark:text-neutral-300'}">${formatMeters(m)}</button>`).join('')}
+      </div>
+      ${rem > 0 ? `
+        <label class="mt-3 flex items-center justify-center gap-2 text-xs text-neutral-600 dark:text-neutral-300">
+          <input type="checkbox" data-lap-remainder-first class="w-4 h-4 accent-lime-600 dark:accent-lime-400" ${lapRemainderFirst ? 'checked' : ''}>
+          半端な${rem}mを最初に走る（レースのスタート位置）
+        </label>` : ''}
+      <table class="mt-3 w-full text-sm">
+        <caption class="sr-only">${formatMeters(distance)}を${formatPaceMinSec(currentPace)}/kmで走ったときの周回ごとの通過タイム</caption>
+        <thead>
+          <tr class="text-[11px] text-neutral-500 dark:text-neutral-400">
+            <th scope="col" class="pb-1 text-left font-semibold">周回</th>
+            <th scope="col" class="pb-1 text-right font-semibold">通過地点</th>
+            <th scope="col" class="pb-1 text-right font-semibold">通過タイム</th>
+          </tr>
+        </thead>
+        <tbody>${rows}</tbody>
+      </table>
+      <p class="mt-3 text-[11px] leading-relaxed text-neutral-500 dark:text-neutral-400">
+        1レーン（1周400m）を一定のペースで走った場合の目安です。外側のレーンは1周が長くなります。
+        距離はメイン画面に表示している${LAP_MIN_DISTANCE.toLocaleString('ja-JP')}m以上から選べます。
+      </p>`;
+  }
+
+  function onLapsViewClick(e) {
+    const distBtn = e.target.closest('[data-lap-distance]');
+    if (distBtn) {
+      saveLapDistance(Number(distBtn.dataset.lapDistance));
+      renderLapsView();
+      const again = lapsViewEl.querySelector(`[data-lap-distance="${distBtn.dataset.lapDistance}"]`);
+      if (again) again.focus();
+      return;
+    }
+    if (e.target.closest('[data-laps-back]')) goBack();
+  }
+
+  function onLapsViewChange(e) {
+    if (!e.target.matches('[data-lap-remainder-first]')) return;
+    lapRemainderFirst = e.target.checked;
+    renderLapsView();
+    const box = lapsViewEl.querySelector('[data-lap-remainder-first]');
+    if (box) box.focus();
+  }
+
+  const VIEW_TITLES = { training: 'トレーニングペース', help: '使い方', laps: '周回表' };
   // sticky ヘッダーの高さ。ヒーローが「ヘッダーの下に隠れた」判定に使う
   const HEADER_HEIGHT_PX = 64;
-  const KNOWN_ROUTES = ['training', 'help', 'distances'];
+  const KNOWN_ROUTES = ['training', 'help', 'distances', 'laps'];
 
   let viewReturnFocus = null;
   let mainScrollY = 0;
@@ -2575,6 +2707,7 @@
     mainViewEl.hidden = !isMain;
     trainingViewEl.hidden = baseView !== 'training';
     helpViewEl.hidden = baseView !== 'help';
+    lapsViewEl.hidden = baseView !== 'laps';
 
     // ヘッダーの左と中央だけを画面に合わせて差し替える。テーマ切り替えは動かさない。
     editDistancesBtn.hidden = !isMain;
@@ -2584,6 +2717,7 @@
     if (!isMain) viewTitleEl.textContent = VIEW_TITLES[baseView] || '';
 
     if (baseView === 'training') enterTrainingView();
+    if (baseView === 'laps') renderLapsView();
     if (route === 'distances') openModal(viewReturnFocus || editDistancesBtn);
     else closeModal();
 
@@ -2673,6 +2807,12 @@
     addDistanceShortcutBtn.addEventListener('click', () => openView('distances', addDistanceShortcutBtn));
 
     buildTrainingView();
+    paceDerivedEl.addEventListener('click', (e) => {
+      const btn = e.target.closest('[data-open-laps]');
+      if (btn) openView('laps', btn);
+    });
+    lapsViewEl.addEventListener('click', onLapsViewClick);
+    lapsViewEl.addEventListener('change', onLapsViewChange);
     vdotBtn.addEventListener('click', () => openView('training', vdotBtn));
     helpBtn.addEventListener('click', () => openView('help', helpBtn));
     backBtn.addEventListener('click', goBack);

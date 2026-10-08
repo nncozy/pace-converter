@@ -159,6 +159,26 @@ html.dark .derived-chip {
 html.dark .derived-chip b {
   color: #bef264;
 }
+/* 1周のチップだけは周回表を開くボタン。押せることが分かるよう矢印を添える */
+.derived-chip-link {
+  cursor: pointer;
+  border-color: rgba(101, 163, 13, 0.45);
+  -webkit-tap-highlight-color: transparent;
+}
+.derived-chip-link:active {
+  transform: scale(0.97);
+}
+html.dark .derived-chip-link {
+  border-color: rgba(163, 230, 53, 0.45);
+}
+.derived-chip-arrow {
+  margin-left: 0.125rem;
+  font-weight: 700;
+  color: #4d7c0f;
+}
+html.dark .derived-chip-arrow {
+  color: #bef264;
+}
 
 /* ---------- ペースのヒーロー入力 ---------- */
 

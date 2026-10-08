@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <meta name="theme-color" content="#0a0e08" id="theme-color-meta">
 <meta name="description" content="距離のタイムを入力すると、同じペースで走った場合の他の距離のタイムを瞬時に自動計算するランナー向けツール。">
 <title>ペース相互換算計算機 | Pace Converter</title>
@@ -52,7 +52,7 @@
 <link rel="stylesheet" href="css/style.css?v=21">
 </head>
 <body class="bg-[#f7faf2] dark:bg-[#0a0e08] text-neutral-900 dark:text-white min-h-screen antialiased transition-colors">
-  <div class="max-w-md mx-auto px-4 pb-16">
+  <div class="max-w-md mx-auto pl-[max(1rem,env(safe-area-inset-left))] pr-[max(1rem,env(safe-area-inset-right))] pb-[calc(4rem+env(safe-area-inset-bottom))]">
 
     <!-- 全画面で共通のヘッダー。メインでは「距離を編集 / タイトルまたは現在ペース」、
          サブ画面（トレーニングペース・使い方）では「戻る / 画面名」に入れ替わる。
@@ -135,6 +135,8 @@
 
         <!-- ペースが決まったときだけ出る派生値。ランナーが頭の中でやる換算を先回りする。 -->
         <div id="pace-derived" hidden class="mt-2 flex flex-wrap justify-center gap-1.5"></div>
+        <!-- 換算結果の読み上げ用（画面には出さない）。入力が止まってから1回だけ更新する -->
+        <div id="pace-announcer" class="sr-only" aria-live="polite" aria-atomic="true"></div>
       </section>
 
       <div class="mb-4 flex items-center justify-center gap-2">

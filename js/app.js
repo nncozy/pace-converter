@@ -71,6 +71,7 @@
   const editDistancesBtn = document.getElementById('edit-distances-btn');
   const addDistanceShortcutBtn = document.getElementById('add-distance-shortcut');
   const paceMinInput = document.getElementById('pace-min-input');
+  const paceAnnouncerEl = document.getElementById('pace-announcer');
   const paceSecInput = document.getElementById('pace-sec-input');
   const vdotBtn = document.getElementById('vdot-btn');
   const introEl = document.getElementById('intro');
@@ -175,17 +176,22 @@
     }
   }
 
+  // 保存しておいたペースと基準を画面に戻す（起動時の復元と、クリアの取り消しで共用）
+  function applySavedPace(pace, source) {
+    currentPace = pace;
+    // 基準だった距離が非表示・削除されていたら、ペース欄を基準として扱う
+    const sourceVisible = visibleDistances().some(({ meters }) => meters === source);
+    paceSource = source === 'pace' || sourceVisible ? source : 'pace';
+    applyPaceToAllVisible();
+    updateSourceHighlight();
+  }
+
   function restorePace() {
     const saved = loadPace();
     if (!saved) return;
-    currentPace = saved.pace;
-    // 基準だった距離が非表示・削除されていたら、ペース欄を基準として扱う
-    const sourceVisible = visibleDistances().some(({ meters }) => meters === saved.source);
-    paceSource = saved.source === 'pace' || sourceVisible ? saved.source : 'pace';
-    applyPaceToAllVisible();
+    applySavedPace(saved.pace, saved.source);
     // 「書き換わった」合図は入力に反応したときのためのもの。開いた瞬間に全欄を光らせない
     pendingFlash.clear();
-    updateSourceHighlight();
   }
 
   function sortedDistances() {
@@ -253,7 +259,7 @@
     // ピン留めブロックとの境界は越えさせない（越えても描画時に戻されるため）。
     // ドラッグと違って何も動いて見えないので、黙って無視せず理由を知らせる。
     if (visible[idx].pinned !== visible[targetIdx].pinned) {
-      showToast('ピン留めの境界はまたげません');
+      showToast('ピン留めした距離とそれ以外の間は移動できません');
       return;
     }
 
@@ -417,9 +423,12 @@
     return { ok: true };
   }
 
+  // 消した項目を返す（取り消しで元の位置・ピン状態のまま戻すため）
   function removeCustomDistance(meters) {
-    distances = distances.filter((d) => !(d.meters === meters && d.custom));
+    const removed = distances.find((d) => d.meters === meters && d.custom) || null;
+    distances = distances.filter((d) => d !== removed);
     saveDistances();
+    return removed;
   }
 
   function setVisibility(meters, visible) {
@@ -554,10 +563,30 @@
         `<span class="derived-chip">時速 <b>${(3600 / perKmSec).toFixed(1)}</b> km/h</span>`,
       ].join('');
       headerPaceValueEl.textContent = formatPaceMinSec(perKmSec);
+      scheduleAnnounce(`1kmあたり${formatPaceSpoken(perKmSec)}。400m 1周 ${formatPaceSpoken(perKmSec * 0.4)}`);
       // 一度でも使い方が分かった人に、初回向けの案内を出し続けない
       dismissIntro(true);
     }
     syncHeaderPace();
+  }
+
+  // 入力のたびに読み上げると打っている途中の値まで読まれるので、手が止まってから
+  // 1回だけ読む。起動時の復元では読まない（announceReady は init の最後で立てる）
+  let announceReady = false;
+  let announceTimer = null;
+  function scheduleAnnounce(text) {
+    if (!announceReady) return;
+    if (announceTimer !== null) clearTimeout(announceTimer);
+    announceTimer = setTimeout(() => {
+      announceTimer = null;
+      paceAnnouncerEl.textContent = text;
+    }, 900);
+  }
+
+  function formatPaceSpoken(totalSec) {
+    const t = Math.max(0, Math.round(totalSec));
+    const m = Math.floor(t / 60);
+    return m > 0 ? `${m}分${t % 60}秒` : `${t}秒`;
   }
 
   // 上部のペース入力欄(分・秒)から currentPace を再計算し、全距離に反映する
@@ -943,6 +972,19 @@
     }
     updateAllUnitVisibility();
     updatePaceSummaryFields();
+  }
+
+  // クリアは「トレーニングペース」ボタンの隣にあり誤タップしやすいので、
+  // 非表示と同じく取り消せるようにする
+  function onResetClick() {
+    const prev = { pace: currentPace, source: paceSource };
+    resetAll();
+    if (prev.pace === null) return;
+    showToast('入力をクリアしました', '元に戻す', () => {
+      applySavedPace(prev.pace, prev.source);
+      updatePaceSummaryFields();
+      savePace();
+    });
   }
 
   // ---------- トースト（取り消し付きの通知） ----------
@@ -1564,11 +1606,11 @@
     modalOverlay.className =
       'fixed inset-0 z-50 hidden items-end sm:items-center justify-center bg-black/60 px-0 sm:px-4';
     modalOverlay.innerHTML = `
-      <div id="distance-modal-panel" role="dialog" aria-modal="true" aria-labelledby="distance-modal-title" tabindex="-1" class="w-full sm:max-w-sm sm:rounded-3xl rounded-t-3xl bg-white/95 dark:bg-neutral-900/95 backdrop-blur-sm border border-lime-600/10 dark:border-lime-400/10 shadow-2xl shadow-lime-900/10 dark:shadow-black/50 p-4 max-h-[80vh] flex flex-col outline-none">
+      <div id="distance-modal-panel" role="dialog" aria-modal="true" aria-labelledby="distance-modal-title" tabindex="-1" class="w-full sm:max-w-sm sm:rounded-3xl rounded-t-3xl bg-white/95 dark:bg-neutral-900/95 backdrop-blur-sm border border-lime-600/10 dark:border-lime-400/10 shadow-2xl shadow-lime-900/10 dark:shadow-black/50 p-4 pb-[max(1rem,env(safe-area-inset-bottom))] max-h-[80vh] flex flex-col outline-none">
         <div class="flex items-center justify-between mb-3">
           <h2 id="distance-modal-title" class="text-base font-bold text-neutral-900 dark:text-white">距離を編集</h2>
           <button id="distance-modal-close" type="button" aria-label="閉じる"
-            class="w-8 h-8 flex items-center justify-center rounded-full text-neutral-500 dark:text-neutral-400 active:bg-neutral-100 dark:active:bg-neutral-800">
+            class="w-11 h-11 -mr-2 flex items-center justify-center rounded-full text-neutral-500 dark:text-neutral-400 active:bg-neutral-100 dark:active:bg-neutral-800">
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-5 h-5">
               <line x1="18" y1="6" x2="6" y2="18"></line>
               <line x1="6" y1="6" x2="18" y2="18"></line>
@@ -1584,14 +1626,14 @@
         <div class="mt-3 pt-3 border-t border-lime-600/10 dark:border-lime-400/10">
           <div class="flex gap-2">
             <input id="new-distance-input" type="number" min="1" max="${MAX_METERS}" step="1" inputmode="numeric"
-              placeholder="距離を追加 (m)"
-              class="flex-1 min-w-0 bg-neutral-100 dark:bg-neutral-800 rounded-xl px-3 py-2 text-sm text-neutral-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-lime-600 dark:focus:ring-lime-400">
+              placeholder="距離を追加 (m)" aria-label="追加する距離（メートル）" aria-describedby="new-distance-error"
+              class="flex-1 min-w-0 bg-neutral-100 dark:bg-neutral-800 rounded-xl px-3 py-2 text-base text-neutral-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-lime-600 dark:focus:ring-lime-400">
             <button id="add-distance-btn" type="button" disabled
               class="px-4 py-2 rounded-xl border border-lime-600/40 dark:border-lime-400/40 text-lime-700 dark:text-lime-300 text-sm font-bold transition shrink-0 disabled:opacity-30 disabled:cursor-not-allowed enabled:active:scale-95 enabled:hover:bg-lime-600/10 dark:enabled:hover:bg-lime-400/10">
               追加
             </button>
           </div>
-          <p id="new-distance-error" class="text-xs text-red-500 mt-1 hidden"></p>
+          <p id="new-distance-error" role="alert" class="text-xs text-red-600 dark:text-red-400 mt-1 hidden"></p>
         </div>
       </div>
     `;
@@ -1645,8 +1687,16 @@
       const delBtn = e.target.closest('.delete-distance-btn');
       if (delBtn) {
         const meters = Number(delBtn.dataset.meters);
-        removeCustomDistance(meters);
+        const removed = removeCustomDistance(meters);
         onDistancesChanged();
+        if (removed) {
+          showToast(`${formatMeters(meters)}を削除しました`, '元に戻す', () => {
+            if (distances.some((d) => d.meters === removed.meters)) return;
+            distances.push(removed);
+            saveDistances();
+            onDistancesChanged();
+          });
+        }
         return;
       }
       const pinBtn = e.target.closest('.pin-distance-btn');
@@ -1744,7 +1794,8 @@
   }
 
   function handleAddDistance() {
-    const meters = parseInt(newDistanceInput.value, 10);
+    // parseInt だと「1.5」が黙って 1m になり、addCustomDistance の整数チェックが効かなかった
+    const meters = Number(newDistanceInput.value);
     const result = addCustomDistance(meters);
     if (!result.ok) {
       newDistanceError.textContent = result.error;
@@ -2134,14 +2185,14 @@
 
         <label for="vdot-distance-select" class="block text-xs font-semibold text-neutral-500 dark:text-neutral-400 mb-1">距離</label>
         <select id="vdot-distance-select"
-          class="w-full bg-neutral-100 dark:bg-neutral-800 rounded-xl px-3 py-2.5 text-sm text-neutral-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-lime-600 dark:focus:ring-lime-400 mb-2">
+          class="w-full bg-neutral-100 dark:bg-neutral-800 rounded-xl px-3 py-2.5 text-base text-neutral-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-lime-600 dark:focus:ring-lime-400 mb-2">
           ${VDOT_PRESET_DISTANCES.map((d) => `<option value="${d.meters}">${d.label}</option>`).join('')}
           <option value="custom">その他（距離を指定）</option>
         </select>
         <div id="vdot-custom-distance-wrap" class="hidden mb-2">
           <input id="vdot-custom-distance-input" type="number" min="1" max="${MAX_METERS}" step="1" inputmode="numeric"
             placeholder="距離 (m)" autocomplete="off" aria-label="距離 (m)"
-            class="w-full bg-neutral-100 dark:bg-neutral-800 rounded-xl px-3 py-2.5 text-sm text-neutral-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-lime-600 dark:focus:ring-lime-400">
+            class="w-full bg-neutral-100 dark:bg-neutral-800 rounded-xl px-3 py-2.5 text-base text-neutral-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-lime-600 dark:focus:ring-lime-400">
         </div>
 
         <span class="block text-xs font-semibold text-neutral-500 dark:text-neutral-400 mb-1 mt-2">タイム</span>
@@ -2575,7 +2626,7 @@
         onDragPointerEnd({ pointerId: dragPointerId });
       }
     });
-    resetBtn.addEventListener('click', resetAll);
+    resetBtn.addEventListener('click', onResetClick);
 
     paceMinInput.addEventListener('input', onPaceSummaryInput);
     paceSecInput.addEventListener('input', onPaceSummaryInput);
@@ -2609,6 +2660,7 @@
     });
     window.addEventListener('hashchange', applyRoute);
     applyRoute();
+    announceReady = true;
   }
 
   init();

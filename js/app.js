@@ -22,8 +22,7 @@
     msToFields,
     vdotFromPerformance,
     predictRaceTimeSec,
-    trainingPaceSecPerKm,
-    ZONE_PCT,
+    zonePaceSecPerKm,
   } = window.PaceCalc;
 
   // 表示順: 時・分・秒・ミリ秒(2桁=センチ秒)
@@ -1750,35 +1749,30 @@
       key: 'E',
       label: 'イージー / LSD',
       desc: '楽に会話できるペース。有酸素の土台作り',
-      pct: ZONE_PCT.E,
       hint: '会話ができるくらい余裕のあるペース。練習の大部分（週の7〜8割くらい）はこの強度で十分です。30分〜2時間ほど、息が弾みすぎない範囲でゆっくり走りましょう。',
     },
     {
       key: 'M',
       label: 'マラソン',
       desc: 'フルマラソンのレースペースの目安',
-      pct: ZONE_PCT.M,
       hint: 'フルマラソンを走るときの目標ペースです。10kmまでしか出ない場合でも、「ちょっと頑張る」持続走（20〜60分ほど）の強度の目安として使えます。',
     },
     {
       key: 'T',
       label: '閾値走',
       desc: '「ややきつい」を1時間ほど保てるペース',
-      pct: ZONE_PCT.T,
       hint: 'きついけど一言二言なら会話できる強度。乳酸がたまり始める境目を押し上げる練習です。20分間走り続けるか、5〜10分の反復を短い休憩（1〜2分のジョグ）を挟んで数本行うのがおすすめ。合計20〜40分くらいが目安です。',
     },
     {
       key: 'I',
       label: 'インターバル',
       desc: 'VO2maxを鍛える高強度ペース',
-      pct: ZONE_PCT.I,
       hint: 'きついが全力ではない強度。3〜5分ほど走って、同じくらいの時間のジョグで回復、を繰り返します（例: 1000mを5本、間はジョグで2〜3分）。フォームが崩れるほど追い込まず、余裕がなくなったら本数を減らして大丈夫です。',
     },
     {
       key: 'R',
       label: 'レペティション',
       desc: 'フォームとスピードを鍛える全力に近いペース',
-      pct: ZONE_PCT.R,
       hint: '速いフォームとスピード感を養うための短い反復走です。200〜400mほどを、しっかり休んで（反復と同じか長めのジョグ・レスト）繰り返します。追い込む練習ではないので、疲れすぎない本数に留めましょう。',
     },
   ];
@@ -1907,7 +1901,7 @@
     const vdot = vdotFromPerformance(meters, totalMs / 1000);
     vdotResultEl.textContent = vdot.toFixed(1);
     TRAINING_ZONES.forEach((z, i) => {
-      zonePaceEls[i].textContent = formatPaceSecPerKm(trainingPaceSecPerKm(vdot, z.pct));
+      zonePaceEls[i].textContent = formatPaceSecPerKm(zonePaceSecPerKm(vdot, z.key));
     });
     updateVdotLevel(vdot, outOfRange);
     updateVdotPredictions(vdot);

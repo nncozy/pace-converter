@@ -22,18 +22,17 @@ const {
   msToFields,
   vdotFromPerformance,
   predictRaceTimeSec,
-  trainingPaceSecPerKm,
-  ZONE_PCT,
+  zonePaceSecPerKm,
 } = calc;
 
-const zonePace = (vdot, key) => formatPaceSecPerKm(trainingPaceSecPerKm(vdot, ZONE_PCT[key]));
+const zonePace = (vdot, key) => formatPaceSecPerKm(zonePaceSecPerKm(vdot, key));
 const predict = (vdot, meters) => formatDurationSec(predictRaceTimeSec(vdot, meters));
 
 // ---------- 換算表との一致 ----------
 
 test('VDOT50のトレーニングペースが換算表と一致する', () => {
   assert.equal(zonePace(50, 'E'), `5'07"`);
-  assert.equal(zonePace(50, 'M'), `4'25"`);
+  assert.equal(zonePace(50, 'M'), `4'31"`);
   assert.equal(zonePace(50, 'T'), `4'15"`);
   assert.equal(zonePace(50, 'I'), `3'54"`);
   assert.equal(zonePace(50, 'R'), `3'41"`);
@@ -41,7 +40,7 @@ test('VDOT50のトレーニングペースが換算表と一致する', () => {
 
 test('VDOT40のトレーニングペースが換算表と一致する', () => {
   assert.equal(zonePace(40, 'E'), `6'07"`);
-  assert.equal(zonePace(40, 'M'), `5'17"`);
+  assert.equal(zonePace(40, 'M'), `5'27"`);
   assert.equal(zonePace(40, 'T'), `5'06"`);
   assert.equal(zonePace(40, 'I'), `4'40"`);
   assert.equal(zonePace(40, 'R'), `4'25"`);
@@ -55,6 +54,16 @@ test('VDOT50の予想タイムが換算表と一致する', () => {
   assert.equal(predict(50, 10000), '41:20');
   assert.equal(predict(50, 21097), '1:31:31');
   assert.equal(predict(50, 42195), '3:10:40');
+});
+
+// Mペースはポテンシャルタイムのフルマラソンと同じ画面に並ぶ。以前は%VO2max 84%固定で
+// 出していたため、VDOT50で M 4'25" / 予想フル 4'31" と食い違い、しかもこのテストが
+// 誤った 4'25" を「換算表の値」として固定していた。どのVDOTでも一致することを確かめる。
+test('Mペースは予想フルマラソンタイムのペースと一致する', () => {
+  for (const vdot of [30, 35, 40, 45, 50, 55, 60, 70]) {
+    const fullPace = predictRaceTimeSec(vdot, 42195) / 42.195;
+    assert.equal(formatPaceSecPerKm(zonePaceSecPerKm(vdot, 'M')), formatPaceSecPerKm(fullPace), `vdot=${vdot}`);
+  }
 });
 
 // レベル判定（js/app.js の VDOT_LEVELS）の境界は、この対応関係を前提に置いてある。
@@ -89,8 +98,8 @@ test('VDOTが上がるほど予想タイムは速く、距離が伸びるほど�
 test('ゾーンはE→Rの順に速くなる', () => {
   const order = ['E', 'M', 'T', 'I', 'R'];
   for (let i = 1; i < order.length; i++) {
-    const slower = trainingPaceSecPerKm(50, ZONE_PCT[order[i - 1]]);
-    const faster = trainingPaceSecPerKm(50, ZONE_PCT[order[i]]);
+    const slower = zonePaceSecPerKm(50, order[i - 1]);
+    const faster = zonePaceSecPerKm(50, order[i]);
     assert.ok(faster < slower, `${order[i]} は ${order[i - 1]} より速いはず`);
   }
 });

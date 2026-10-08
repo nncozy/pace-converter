@@ -125,7 +125,19 @@
 
   // 各トレーニングゾーンの%VO2max。ラベルや解説文（js/app.js側）と違って
   // 出る数値を直接決める値なので、テストが届くこちらに置いている。
-  const ZONE_PCT = { E: 0.70, M: 0.84, T: 0.88, I: 0.98, R: 1.05 };
+  // Mだけはここに無い: Danielsの M ペースは「そのVDOTでの予想フルマラソンの
+  // レースペース」そのもので、強度はVDOTによって約80〜83%と動く。以前は 0.84 で
+  // 固定していたため、VDOT50で4'25"（予想フルは4'31"）と速く出ていた。
+  const ZONE_PCT = { E: 0.70, T: 0.88, I: 0.98, R: 1.05 };
+
+  const MARATHON_METERS = 42195;
+
+  // ゾーン（E/M/T/I/R）の目安ペース(秒/km)。Mは予想フルマラソンタイムから出すので、
+  // ポテンシャルタイムのフルマラソンと必ず同じペースになる。
+  function zonePaceSecPerKm(vdot, key) {
+    if (key === 'M') return predictRaceTimeSec(vdot, MARATHON_METERS) / (MARATHON_METERS / 1000);
+    return trainingPaceSecPerKm(vdot, ZONE_PCT[key]);
+  }
 
   return {
     UNIT_MAX,
@@ -140,6 +152,7 @@
     predictRaceTimeSec,
     velocityFromVO2,
     trainingPaceSecPerKm,
+    zonePaceSecPerKm,
     ZONE_PCT,
   };
 });

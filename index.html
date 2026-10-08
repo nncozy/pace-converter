@@ -54,13 +54,13 @@
 <body class="bg-[#f7faf2] dark:bg-[#0a0e08] text-neutral-900 dark:text-white min-h-screen antialiased transition-colors">
   <div class="max-w-md mx-auto pl-[max(1rem,env(safe-area-inset-left))] pr-[max(1rem,env(safe-area-inset-right))] pb-[calc(4rem+env(safe-area-inset-bottom))]">
 
-    <!-- 全画面で共通のヘッダー。メインでは「距離を編集 / タイトルまたは現在ペース」、
+    <!-- 全画面で共通のヘッダー。メインでは「距離を追加・編集 / タイトルまたは現在ペース」、
          サブ画面（トレーニングペース・使い方）では「戻る / 画面名」に入れ替わる。
          テーマ切り替えだけはどの画面でも同じ位置に残す。 -->
     <header id="app-header"
       class="sticky top-0 z-30 -mx-4 px-4 pt-[max(0.5rem,env(safe-area-inset-top))] pb-2 bg-[#f7faf2]/85 dark:bg-[#0a0e08]/85 backdrop-blur-md border-b border-lime-600/10 dark:border-lime-400/10">
       <div class="flex items-center justify-between gap-2">
-        <button id="edit-distances-btn" type="button" aria-label="距離を編集" class="icon-btn">
+        <button id="edit-distances-btn" type="button" aria-label="距離を追加・編集" class="icon-btn">
           <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-5 h-5">
             <line x1="4" y1="6" x2="20" y2="6"></line>
             <line x1="4" y1="12" x2="20" y2="12"></line>
@@ -99,7 +99,7 @@
       <!-- 初回だけの案内。毎日使う人には不要なので、一度ペースを入れたら以後は出ない。 -->
       <section id="intro" hidden class="relative mt-3 rounded-2xl border border-lime-600/20 dark:border-lime-400/20 bg-white/70 dark:bg-neutral-900/70 backdrop-blur-sm px-4 py-3">
         <button id="intro-dismiss" type="button" aria-label="この案内を閉じる"
-          class="absolute top-1.5 right-1.5 w-7 h-7 flex items-center justify-center rounded-full text-neutral-400 dark:text-neutral-600 active:bg-neutral-100 dark:active:bg-neutral-800">
+          class="hit-44 absolute top-1.5 right-1.5 w-7 h-7 flex items-center justify-center rounded-full text-neutral-500 dark:text-neutral-400 active:bg-neutral-100 dark:active:bg-neutral-800">
           <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" class="w-4 h-4">
             <line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line>
           </svg>
@@ -110,7 +110,7 @@
         <div class="flex flex-wrap justify-center gap-1.5 mt-2.5">
           <span class="info-chip">🔓 ログイン不要</span>
           <span class="info-chip">📱 ホーム画面に追加OK</span>
-          <span class="info-chip">⚡ 瞬時に自動計算</span>
+          <span class="info-chip">📶 オフラインでも使える</span>
         </div>
       </section>
 
@@ -163,7 +163,7 @@
         <span class="shrink-0 pt-px">💡</span>
         <span class="flex-1">カードを<b class="font-bold text-neutral-700 dark:text-neutral-200">右スワイプでピン留め</b>／<b class="font-bold text-neutral-700 dark:text-neutral-200">左スワイプで非表示</b></span>
         <button id="swipe-coach-dismiss" type="button" aria-label="ヒントを閉じる"
-          class="shrink-0 -mt-0.5 -mr-1 w-6 h-6 flex items-center justify-center rounded-full text-neutral-400 dark:text-neutral-600 active:bg-neutral-100 dark:active:bg-neutral-800">
+          class="hit-44 relative shrink-0 -mt-0.5 -mr-1 w-6 h-6 flex items-center justify-center rounded-full text-neutral-500 dark:text-neutral-400 active:bg-neutral-100 dark:active:bg-neutral-800">
           <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" class="w-3.5 h-3.5">
             <line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line>
           </svg>
@@ -221,7 +221,7 @@
           <li>小さくスワイプするとボタンが出たまま留まるのでタップして実行、大きく払い切ればその場で実行されます。</li>
           <li>非表示にすると「元に戻す」付きの通知が出ます。</li>
           <li>カード左上の「⠿」をドラッグすると並び替えられます（キーボードでは矢印キーの上下）。</li>
-          <li>スワイプが使えない環境向けに、同じ操作は「距離を追加・編集」からも行えます。</li>
+          <li>スワイプが使えない環境向けに、ピン留めと非表示は「距離を追加・編集」からも行えます。</li>
         </ul>
       </section>
 

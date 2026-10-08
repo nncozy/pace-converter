@@ -560,7 +560,7 @@
       paceDerivedEl.innerHTML = [
         `<span class="derived-chip">400m 1周 <b>${formatPaceMinSec(perKmSec * 0.4)}</b></span>`,
         `<span class="derived-chip">1マイル <b>${formatPaceMinSec(perKmSec * 1.609344)}</b></span>`,
-        `<span class="derived-chip">時速 <b>${(3600 / perKmSec).toFixed(1)}</b> km/h</span>`,
+        `<span class="derived-chip">時速 <b>${(3600 / perKmSec).toFixed(1)}</b> km</span>`,
       ].join('');
       headerPaceValueEl.textContent = formatPaceMinSec(perKmSec);
       scheduleAnnounce(`1kmあたり${formatPaceSpoken(perKmSec)}。400m 1周 ${formatPaceSpoken(perKmSec * 0.4)}`);
@@ -679,7 +679,7 @@
 
     if (visible.length === 0) {
       const empty = document.createElement('div');
-      empty.className = 'text-center text-sm text-neutral-400 dark:text-neutral-600 py-10 leading-relaxed';
+      empty.className = 'text-center text-sm text-neutral-500 dark:text-neutral-400 py-10 leading-relaxed';
       empty.textContent = '表示する距離がありません。左上の編集ボタンから距離を追加・表示してください。';
       listEl.appendChild(empty);
       return;
@@ -709,7 +709,7 @@
       const header = document.createElement('div');
       header.className = 'flex items-center gap-2 mb-1.5';
       header.innerHTML = `
-        <button type="button" class="drag-handle shrink-0 w-7 h-7 flex items-center justify-center rounded-full text-neutral-400 dark:text-neutral-600 touch-none cursor-grab active:cursor-grabbing" aria-label="${meters}mを並び替え（矢印キーの上下でも移動できます）" data-distance="${meters}">
+        <button type="button" class="drag-handle hit-44 relative shrink-0 w-7 h-7 flex items-center justify-center rounded-full text-neutral-500 dark:text-neutral-400 touch-none cursor-grab active:cursor-grabbing" aria-label="${meters}mを並び替え（矢印キーの上下でも移動できます）" data-distance="${meters}">
           <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
             <circle cx="9" cy="6" r="1.6"></circle><circle cx="15" cy="6" r="1.6"></circle>
             <circle cx="9" cy="12" r="1.6"></circle><circle cx="15" cy="12" r="1.6"></circle>
@@ -717,10 +717,10 @@
           </svg>
         </button>
         <div class="flex-1 min-w-0 flex items-baseline justify-center gap-1.5">
-          <span class="font-extrabold text-lime-600 dark:text-lime-400 text-lg">${meters.toLocaleString('ja-JP')}</span>
+          <span class="font-extrabold text-lime-700 dark:text-lime-400 text-lg">${meters.toLocaleString('ja-JP')}</span>
           <span class="text-xs text-neutral-500 dark:text-neutral-500 font-normal">m</span>
-          ${alt ? `<span class="text-[10px] text-neutral-400 dark:text-neutral-600 font-normal">(${alt})</span>` : ''}
-          <span class="source-badge shrink-0 rounded-full bg-lime-600 dark:bg-lime-400 px-1.5 py-px text-[9px] font-bold leading-tight text-neutral-950">基準</span>
+          ${alt ? `<span class="text-[10px] text-neutral-500 dark:text-neutral-400 font-normal">(${alt})</span>` : ''}
+          <span class="source-badge shrink-0 rounded-full bg-lime-600 dark:bg-lime-400 px-1.5 py-px text-[10px] font-bold leading-tight text-neutral-950">基準</span>
         </div>
         ${pinned
           ? `<span class="w-7 h-7 shrink-0 flex items-center justify-center text-lime-600 dark:text-lime-400" role="img" aria-label="ピン留め中">${PIN_ICON}</span>`
@@ -767,7 +767,7 @@
         stack.appendChild(input);
 
         const label = document.createElement('span');
-        label.className = 'mt-0.5 text-[9px] leading-none text-neutral-400 dark:text-neutral-600 font-mono';
+        label.className = 'mt-0.5 text-[10px] leading-none text-neutral-500 dark:text-neutral-400 font-mono';
         label.textContent = UNIT_LABEL[unit];
         stack.appendChild(label);
 
@@ -1608,7 +1608,7 @@
     modalOverlay.innerHTML = `
       <div id="distance-modal-panel" role="dialog" aria-modal="true" aria-labelledby="distance-modal-title" tabindex="-1" class="w-full sm:max-w-sm sm:rounded-3xl rounded-t-3xl bg-white/95 dark:bg-neutral-900/95 backdrop-blur-sm border border-lime-600/10 dark:border-lime-400/10 shadow-2xl shadow-lime-900/10 dark:shadow-black/50 p-4 pb-[max(1rem,env(safe-area-inset-bottom))] max-h-[80vh] flex flex-col outline-none">
         <div class="flex items-center justify-between mb-3">
-          <h2 id="distance-modal-title" class="text-base font-bold text-neutral-900 dark:text-white">距離を編集</h2>
+          <h2 id="distance-modal-title" class="text-base font-bold text-neutral-900 dark:text-white">距離を追加・編集</h2>
           <button id="distance-modal-close" type="button" aria-label="閉じる"
             class="w-11 h-11 -mr-2 flex items-center justify-center rounded-full text-neutral-500 dark:text-neutral-400 active:bg-neutral-100 dark:active:bg-neutral-800">
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-5 h-5">
@@ -1757,19 +1757,19 @@
         <span class="flex items-center gap-2 min-w-0">
           <input type="checkbox" data-meters="${meters}" class="visibility-checkbox w-4 h-4 accent-lime-600 dark:accent-lime-400 shrink-0" ${visible ? 'checked' : ''}>
           <span class="text-sm text-neutral-800 dark:text-neutral-200 truncate">
-            ${meters.toLocaleString('ja-JP')}m${alt ? ` <span class="text-neutral-400 dark:text-neutral-600">(${alt})</span>` : ''}
+            ${meters.toLocaleString('ja-JP')}m${alt ? ` <span class="text-neutral-500 dark:text-neutral-400">(${alt})</span>` : ''}
           </span>
         </span>
         <span class="flex items-center gap-0.5 shrink-0">
           ${visible
             ? `<button type="button" data-meters="${meters}" aria-pressed="${pinned ? 'true' : 'false'}" aria-label="${meters}mのピン留めを切り替え"
-                class="pin-distance-btn w-7 h-7 flex items-center justify-center rounded-full ${pinned ? 'text-lime-600 dark:text-lime-400' : 'text-neutral-300 dark:text-neutral-700'} active:bg-neutral-100 dark:active:bg-neutral-800">
+                class="pin-distance-btn hit-44 relative w-7 h-7 flex items-center justify-center rounded-full ${pinned ? 'text-lime-600 dark:text-lime-400' : 'text-neutral-500 dark:text-neutral-500'} active:bg-neutral-100 dark:active:bg-neutral-800">
                 ${PIN_ICON}
               </button>`
             : '<span class="w-7 h-7"></span>'}
           ${custom
             ? `<button type="button" data-meters="${meters}" aria-label="${meters}mを削除"
-                class="delete-distance-btn w-7 h-7 flex items-center justify-center rounded-full text-neutral-400 dark:text-neutral-600 active:text-red-500 active:bg-neutral-100 dark:active:bg-neutral-800">
+                class="delete-distance-btn hit-44 relative w-7 h-7 flex items-center justify-center rounded-full text-neutral-500 dark:text-neutral-400 active:text-red-500 active:bg-neutral-100 dark:active:bg-neutral-800">
                 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-4 h-4">
                   <polyline points="3 6 5 6 21 6"></polyline>
                   <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
@@ -2209,7 +2209,7 @@
           <input id="vdot-cs-input" type="number" inputmode="numeric" pattern="[0-9]*" min="0" max="99" placeholder="--" autocomplete="off" aria-label="100分の1秒"
             class="vdot-time-input w-12 bg-neutral-200 dark:bg-neutral-800 rounded-xl text-center text-lg font-mono py-2 focus:outline-none focus:ring-2 focus:ring-lime-600 dark:focus:ring-lime-400 text-neutral-900 dark:text-white transition-shadow" data-vdot-unit="cs">
         </div>
-        <div class="flex justify-center gap-0.5 mt-1 text-[10px] text-neutral-400 dark:text-neutral-600 font-mono">
+        <div class="flex justify-center gap-0.5 mt-1 text-[10px] text-neutral-500 dark:text-neutral-400 font-mono">
           <span class="w-12 text-center">時</span><span class="w-3"></span>
           <span class="w-12 text-center">分</span><span class="w-3"></span>
           <span class="w-12 text-center">秒</span><span class="w-3"></span>
@@ -2220,40 +2220,40 @@
       <!-- 2つのタブの共通の前提になる数値なので、タブの外に置いて切り替えでも消さない -->
       <section class="mt-3 rounded-2xl border border-lime-600/15 dark:border-lime-400/15 bg-white/70 dark:bg-neutral-900/70 px-3.5 py-3">
         <div class="flex items-baseline justify-center gap-2">
-          <span class="text-[10px] font-black tracking-widest text-neutral-400 dark:text-neutral-600 uppercase">VDOT</span>
+          <span class="text-[10px] font-black tracking-widest text-neutral-500 dark:text-neutral-400 uppercase">VDOT</span>
           <span id="vdot-result-value" aria-live="polite"
             class="text-3xl font-black leading-none bg-gradient-to-r from-lime-600 to-green-500 dark:from-lime-400 dark:to-green-300 bg-clip-text text-transparent">--</span>
         </div>
         <p id="vdot-range-warning" class="hidden mt-1.5 px-2.5 py-1.5 rounded-lg text-[10px] leading-relaxed text-amber-700 dark:text-amber-300 bg-amber-500/10 dark:bg-amber-400/10"></p>
         <div class="mt-1.5" aria-live="polite">
           <div id="vdot-level-label" class="text-center text-xs font-bold text-lime-700 dark:text-lime-300">--</div>
-          <div id="vdot-level-desc" class="text-center text-[10px] text-neutral-400 dark:text-neutral-600 mb-1.5 leading-relaxed">距離とタイムを入力すると目安が表示されます</div>
+          <div id="vdot-level-desc" class="text-center text-[10px] text-neutral-500 dark:text-neutral-400 mb-1.5 leading-relaxed">距離とタイムを入力すると目安が表示されます</div>
           <div class="h-1.5 rounded-full bg-neutral-200 dark:bg-neutral-800">
             <div id="vdot-level-fill" class="h-1.5 rounded-full bg-gradient-to-r from-lime-600 to-green-500 dark:from-lime-400 dark:to-green-300 transition-all" style="width: 0%"></div>
           </div>
-          <div class="flex justify-between text-[9px] text-neutral-400 dark:text-neutral-600 mt-1">
+          <div class="flex justify-between text-[10px] text-neutral-500 dark:text-neutral-400 mt-1">
             <span>初心者</span>
             <span>エリート</span>
           </div>
         </div>
       </section>
 
-      <!-- 練習ペースとポテンシャルタイムは同じ入力から出る対等な2つの結果。
+      <!-- ゾーン別ペースとポテンシャルタイムは同じ入力から出る対等な2つの結果。
            縦に直列させると後ろ側が800px下に沈むので、横に並べて1タップで行き来させる。 -->
       <div role="tablist" aria-label="トレーニングペースの表示切り替え" class="seg-tabs sticky top-[3.25rem] z-20 mt-3">
-        <button type="button" role="tab" id="tab-zones" aria-controls="panel-zones" aria-selected="true" class="seg-tab">練習ペース</button>
+        <button type="button" role="tab" id="tab-zones" aria-controls="panel-zones" aria-selected="true" class="seg-tab">ゾーン別ペース</button>
         <button type="button" role="tab" id="tab-predict" aria-controls="panel-predict" aria-selected="false" class="seg-tab">ポテンシャルタイム</button>
       </div>
 
       <section id="panel-zones" role="tabpanel" aria-labelledby="tab-zones" tabindex="0" class="mt-3 outline-none">
-        <p class="text-[10px] text-neutral-400 dark:text-neutral-600 leading-relaxed mb-2">各ペースの名前をタップすると、練習の目安ややり方が見られます。</p>
+        <p class="text-[10px] text-neutral-500 dark:text-neutral-400 leading-relaxed mb-2">各ペースの名前をタップすると、練習の目安ややり方が見られます。</p>
         <div id="vdot-zone-list" class="space-y-1.5"></div>
       </section>
 
       <section id="panel-predict" role="tabpanel" aria-labelledby="tab-predict" tabindex="0" hidden class="mt-3 outline-none">
         <p class="text-[10px] text-neutral-500 dark:text-neutral-400 leading-relaxed mb-2">※これは持久力トレーニングを積んだ場合に発揮できる「ポテンシャル」の目安です。今すぐ出せるタイムを保証するものではありません。</p>
         <div id="vdot-predict-list" class="space-y-1"></div>
-        <p class="text-[9px] text-neutral-400 dark:text-neutral-600 leading-relaxed mt-2">※有効範囲は1,500m〜フルマラソン程度です（短距離・ウルトラマラソンは対象外）</p>
+        <p class="text-[10px] text-neutral-500 dark:text-neutral-400 leading-relaxed mt-2">※有効範囲は1,500m〜フルマラソン程度です（短距離・ウルトラマラソンは対象外）</p>
         <button id="vdot-predict-help-btn" type="button" class="btn-ghost mt-2">
           <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-3.5 h-3.5">
             <circle cx="12" cy="12" r="9"></circle>
@@ -2312,14 +2312,14 @@
           <span class="shrink-0 w-8 h-8 flex items-center justify-center rounded-full bg-gradient-to-br from-lime-600 to-green-500 dark:from-lime-400 dark:to-green-300 text-neutral-950 text-xs font-black">${z.key}</span>
           <div class="flex-1 min-w-0">
             <div class="text-xs font-semibold text-neutral-800 dark:text-neutral-200">${z.label}</div>
-            <div class="text-[10px] text-neutral-400 dark:text-neutral-600 truncate">${z.desc}</div>
+            <div class="text-[10px] text-neutral-500 dark:text-neutral-400 truncate">${z.desc}</div>
           </div>
           <div class="shrink-0 text-right">
             <div class="vdot-zone-pace text-sm font-mono font-bold text-neutral-900 dark:text-white" data-zone="${z.key}">--'--"</div>
-            <div class="text-[9px] text-neutral-400 dark:text-neutral-600">/ km</div>
+            <div class="text-[10px] text-neutral-500 dark:text-neutral-400">/ km</div>
             ${z.laps.map((m) => `<div class="vdot-zone-lap text-[11px] font-mono font-semibold text-lime-700 dark:text-lime-300 whitespace-nowrap" data-zone="${z.key}" data-lap="${m}"></div>`).join('')}
           </div>
-          <svg class="vdot-zone-chevron shrink-0 w-4 h-4 text-neutral-400 dark:text-neutral-600 transition-transform" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <svg class="vdot-zone-chevron shrink-0 w-4 h-4 text-neutral-500 dark:text-neutral-400 transition-transform" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <polyline points="6 9 12 15 18 9"></polyline>
           </svg>
         </button>

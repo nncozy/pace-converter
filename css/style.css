@@ -558,3 +558,15 @@ body.dragging {
 .animate-fade-in-up {
   animation: fade-in-up 0.45s ease-out both;
 }
+
+/* 見た目は小さいままで、当たり判定だけ44px四方に広げる（汗で滑る指でも押せるように）。
+   付ける要素は relative か absolute で位置指定されていること */
+.hit-44::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 44px;
+  height: 44px;
+  transform: translate(-50%, -50%);
+}

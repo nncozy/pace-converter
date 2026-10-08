@@ -2305,9 +2305,9 @@
 
 
 
-    // 読み方の解説は使い方画面に集約したので、ここからはそこへ送るだけにする
+    // 読み方の解説は使い方画面に集約したので、ここからはその節へ送るだけにする
     trainingViewEl.querySelector('#vdot-predict-help-btn').addEventListener('click', (e) => {
-      openView('help', e.currentTarget);
+      openView('help', e.currentTarget, 'help-potential');
     });
 
     const zoneListEl = trainingViewEl.querySelector('#vdot-zone-list');
@@ -2529,10 +2529,13 @@
     return (history.state && history.state.inAppDepth) || 0;
   }
 
-  function openView(name, triggerEl) {
+  // anchorId を渡すと、画面を開いたあとその要素の位置までスクロールする
+  function openView(name, triggerEl, anchorId) {
     viewReturnFocus = triggerEl || document.activeElement;
     history.pushState({ inAppDepth: inAppDepth() + 1 }, '', `#${name}`);
     applyRoute();
+    const anchor = anchorId ? document.getElementById(anchorId) : null;
+    if (anchor) anchor.scrollIntoView({ block: 'start' });
   }
 
   function goBack() {

@@ -1,7 +1,7 @@
 {
-  "name": "ペース相互換算計算機 | Pace Converter",
+  "name": "Pace Converter ペース計算",
   "short_name": "Pace Converter",
-  "description": "距離のタイムを入力すると、同じペースで走った場合の他の距離のタイムを瞬時に自動計算するランナー向けツール。",
+  "description": "キロ何分のペースや好きな距離のタイムを入れるだけで、400m 1周・5km・10km・ハーフ・フルマラソンのタイムを一括で換算。VDOTからE/M/T/I/Rの練習ペースとトラック1周のタイムも出せる、登録不要・オフライン対応のランナー向けツール。",
   "start_url": "./index.html",
   "scope": "./",
   "display": "standalone",

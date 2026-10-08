@@ -4,9 +4,10 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <meta name="theme-color" content="#0a0e08" id="theme-color-meta">
-<meta name="description" content="距離のタイムを入力すると、同じペースで走った場合の他の距離のタイムを瞬時に自動計算するランナー向けツール。">
-<title>ペース相互換算計算機 | Pace Converter</title>
+<meta name="description" content="キロ何分のペースや好きな距離のタイムを入れるだけで、400m 1周・5km・10km・ハーフ・フルマラソンのタイムを一括で換算。VDOTからE/M/T/I/Rの練習ペースとトラック1周のタイムも出せる、登録不要・オフライン対応のランナー向けツール。">
+<title>ランニングのペース計算｜キロ何分・400m何秒・VDOT練習ペース - Pace Converter</title>
 
+<link rel="canonical" href="https://nncozy.github.io/pace-converter/">
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
 <link rel="icon" href="favicon.ico" sizes="any">
 <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
@@ -19,15 +20,15 @@
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="Pace Converter">
 <meta property="og:locale" content="ja_JP">
-<meta property="og:title" content="ペース相互換算計算機 | Pace Converter">
-<meta property="og:description" content="距離のタイムを入力すると、同じペースで走った場合の他の距離のタイムを瞬時に自動計算するランナー向けツール。">
+<meta property="og:title" content="ランニングのペース計算｜キロ何分・400m何秒・VDOT練習ペース - Pace Converter">
+<meta property="og:description" content="キロ何分のペースや好きな距離のタイムを入れるだけで、400m 1周・5km・10km・ハーフ・フルマラソンのタイムを一括で換算。VDOTからE/M/T/I/Rの練習ペースとトラック1周のタイムも出せる、登録不要・オフライン対応のランナー向けツール。">
 <meta property="og:url" content="https://nncozy.github.io/pace-converter/">
 <meta property="og:image" content="https://nncozy.github.io/pace-converter/icons/og-image.png">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
 <meta name="twitter:card" content="summary_large_image">
-<meta name="twitter:title" content="ペース相互換算計算機 | Pace Converter">
-<meta name="twitter:description" content="距離のタイムを入力すると、同じペースで走った場合の他の距離のタイムを瞬時に自動計算するランナー向けツール。">
+<meta name="twitter:title" content="ランニングのペース計算｜キロ何分・400m何秒・VDOT練習ペース - Pace Converter">
+<meta name="twitter:description" content="キロ何分のペースや好きな距離のタイムを入れるだけで、400m 1周・5km・10km・ハーフ・フルマラソンのタイムを一括で換算。VDOTからE/M/T/I/Rの練習ペースとトラック1周のタイムも出せる、登録不要・オフライン対応のランナー向けツール。">
 <meta name="twitter:image" content="https://nncozy.github.io/pace-converter/icons/og-image.png">
 
 <script src="https://cdn.tailwindcss.com"></script>
@@ -78,7 +79,9 @@
 
         <div class="flex-1 min-w-0 text-center">
           <h1 id="app-title" class="text-lg font-black tracking-tight truncate bg-gradient-to-r from-lime-600 to-green-500 dark:from-lime-400 dark:to-green-300 bg-clip-text text-transparent">
-            PACE CONVERTER
+            <span aria-hidden="true">PACE CONVERTER</span>
+            <!-- 見出しが英語のロゴだけだと、検索にも読み上げにも何のページか伝わらない -->
+            <span class="sr-only">ランニングのペース計算機（Pace Converter）</span>
           </h1>
           <!-- ヒーローのペース欄が画面外へ出たときだけ、ここに基準ペースを差し替えて出す -->
           <button id="header-pace" type="button" hidden

@@ -205,8 +205,10 @@ html.dark .pace-input:focus {
   caret-color: currentColor;
   /* グラデーション面の上に、押せる「窪み」として置く。ただの表示ではなく
      入力欄だと分かるようにするのが目的なので、枠ではなく面の差で示す */
-  color: #fff;
-  background: rgba(255, 255, 255, 0.14);
+  /* 白文字だとライトモードの黄緑（lime-600→green-500）に対して2.1〜2.6:1しか取れず、
+     屋外で一番読みたい数字が一番読みにくかった。両テーマとも黒文字にそろえる（5.4:1以上） */
+  color: #0a0a0a;
+  background: rgba(10, 10, 10, 0.1);
   border: none;
   border-radius: 0.625rem;
   /* 44px前後のタップ領域を確保する（text-3xlの行高36pxだけでは足りない） */
@@ -215,20 +217,12 @@ html.dark .pace-input:focus {
   transition: background-color 120ms ease;
 }
 .pace-summary-input::placeholder {
-  color: rgba(255, 255, 255, 0.6);
+  color: rgba(10, 10, 10, 0.5);
 }
 .pace-summary-input:focus {
-  background: rgba(255, 255, 255, 0.3);
-}
-html.dark .pace-summary-input {
-  color: #0a0a0a;
-  background: rgba(10, 10, 10, 0.1);
-}
-html.dark .pace-summary-input::placeholder {
-  color: rgba(10, 10, 10, 0.45);
-}
-html.dark .pace-summary-input:focus {
   background: rgba(10, 10, 10, 0.2);
+  /* 背景の濃淡だけだと今どちらの欄にいるか分かりにくいので、縁取りも足す */
+  box-shadow: inset 0 0 0 2px rgba(10, 10, 10, 0.55);
 }
 
 /* ---------- 距離カード ---------- */

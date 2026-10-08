@@ -637,7 +637,7 @@
           <span class="font-extrabold text-lime-600 dark:text-lime-400 text-lg">${meters.toLocaleString('ja-JP')}</span>
           <span class="text-xs text-neutral-500 dark:text-neutral-500 font-normal">m</span>
           ${alt ? `<span class="text-[10px] text-neutral-400 dark:text-neutral-600 font-normal">(${alt})</span>` : ''}
-          <span class="source-badge shrink-0 rounded-full bg-lime-600 dark:bg-lime-400 px-1.5 py-px text-[9px] font-bold leading-tight text-white dark:text-neutral-950">基準</span>
+          <span class="source-badge shrink-0 rounded-full bg-lime-600 dark:bg-lime-400 px-1.5 py-px text-[9px] font-bold leading-tight text-neutral-950">基準</span>
         </div>
         ${pinned
           ? `<span class="w-7 h-7 shrink-0 flex items-center justify-center text-lime-600 dark:text-lime-400" role="img" aria-label="ピン留め中">${PIN_ICON}</span>`
@@ -2146,7 +2146,7 @@
       row.className = 'rounded-xl bg-neutral-100/70 dark:bg-neutral-800/70 overflow-hidden';
       row.innerHTML = `
         <button type="button" class="vdot-zone-toggle w-full flex items-center gap-2 px-3 py-2 text-left" aria-expanded="false">
-          <span class="shrink-0 w-8 h-8 flex items-center justify-center rounded-full bg-gradient-to-br from-lime-600 to-green-500 dark:from-lime-400 dark:to-green-300 text-white dark:text-neutral-950 text-xs font-black">${z.key}</span>
+          <span class="shrink-0 w-8 h-8 flex items-center justify-center rounded-full bg-gradient-to-br from-lime-600 to-green-500 dark:from-lime-400 dark:to-green-300 text-neutral-950 text-xs font-black">${z.key}</span>
           <div class="flex-1 min-w-0">
             <div class="text-xs font-semibold text-neutral-800 dark:text-neutral-200">${z.label}</div>
             <div class="text-[10px] text-neutral-400 dark:text-neutral-600 truncate">${z.desc}</div>

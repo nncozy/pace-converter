@@ -82,7 +82,7 @@
           </h1>
           <!-- ヒーローのペース欄が画面外へ出たときだけ、ここに基準ペースを差し替えて出す -->
           <button id="header-pace" type="button" hidden
-            class="mx-auto items-baseline gap-0.5 rounded-full bg-gradient-to-r from-lime-600 to-green-500 dark:from-lime-400 dark:to-green-300 px-3 py-1 text-white dark:text-neutral-950 shadow-sm">
+            class="mx-auto items-baseline gap-0.5 rounded-full bg-gradient-to-r from-lime-600 to-green-500 dark:from-lime-400 dark:to-green-300 px-3 py-1 text-neutral-950 shadow-sm">
             <span class="header-pace-value font-mono font-black text-sm tabular-nums"></span>
             <span class="text-[10px] font-bold opacity-80">/ km</span>
           </button>
@@ -118,19 +118,19 @@
            入力欄そのものに凹んだ面を持たせている。 -->
       <section id="pace-hero" class="mt-4 mb-3 text-center">
         <div class="pace-hero-card inline-flex flex-col items-center gap-1 rounded-3xl bg-gradient-to-br from-lime-600 to-green-500 dark:from-lime-400 dark:to-green-300 px-5 pt-2.5 pb-2 shadow-lg shadow-lime-600/25 dark:shadow-lime-400/15">
-          <span class="text-[10px] font-black tracking-widest text-white/80 dark:text-neutral-950/60 uppercase">Pace</span>
+          <span class="text-[10px] font-black tracking-widest text-neutral-950/80 dark:text-neutral-950/75 uppercase">Pace</span>
           <div class="flex items-baseline gap-1">
             <input id="pace-min-input" type="number" inputmode="numeric" pattern="[0-9]*" min="0" max="999" placeholder="--"
               aria-label="1kmあたりの分"
               class="pace-summary-input w-[3.1rem] text-3xl font-black font-mono tabular-nums text-right">
-            <span class="text-white dark:text-neutral-950 text-3xl font-black leading-none">'</span>
+            <span class="text-neutral-950 text-3xl font-black leading-none">'</span>
             <input id="pace-sec-input" type="number" inputmode="numeric" pattern="[0-9]*" min="0" max="59" placeholder="--"
               aria-label="1kmあたりの秒"
               class="pace-summary-input w-[2.9rem] text-3xl font-black font-mono tabular-nums">
-            <span class="text-white dark:text-neutral-950 text-3xl font-black leading-none">"</span>
-            <span class="text-white/85 dark:text-neutral-950/70 text-xs font-bold ml-1 self-center">/ km</span>
+            <span class="text-neutral-950 text-3xl font-black leading-none">"</span>
+            <span class="text-neutral-950/80 dark:text-neutral-950/75 text-xs font-bold ml-1 self-center">/ km</span>
           </div>
-          <span class="text-[10px] font-semibold text-white/75 dark:text-neutral-950/60">タップして直接入力できます</span>
+          <span class="text-[10px] font-semibold text-neutral-950/80 dark:text-neutral-950/75">タップして直接入力できます</span>
         </div>
 
         <!-- ペースが決まったときだけ出る派生値。ランナーが頭の中でやる換算を先回りする。 -->

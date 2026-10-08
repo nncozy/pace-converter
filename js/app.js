@@ -318,8 +318,6 @@
     return true;
   }
 
-  // 常設対象でない欄も、0以外の値が入った時点で必ず出す。値があるのに隠すと
-  // 「入力が消えた」ように見えるうえ、合計タイムの読み方まで嘘になる。
   // 計算結果としてカードに出すタイム。1/100秒の欄を常設しない距離（3,000m超）では
   // 秒単位に丸める。丸めないとフルマラソンが 3:30:58.50 のように出て、普段は
   // 畳んでいる欄が計算のたびに現れたり消えたりする（カード幅も変わる）
@@ -327,6 +325,8 @@
     return unitAlwaysVisible('cs', meters) ? ms : Math.round(ms / 1000) * 1000;
   }
 
+  // 常設対象でない欄も、0以外の値が入った時点で必ず出す。値があるのに隠すと
+  // 「入力が消えた」ように見えるうえ、合計タイムの読み方まで嘘になる。
   function updateUnitVisibility(meters) {
     const card = listEl.querySelector(`.distance-card[data-distance="${meters}"]`);
     if (!card) return;
@@ -1760,22 +1760,24 @@
             ${meters.toLocaleString('ja-JP')}m${alt ? ` <span class="text-neutral-500 dark:text-neutral-400">(${alt})</span>` : ''}
           </span>
         </span>
-        <span class="flex items-center gap-0.5 shrink-0">
+        <!-- ピンと削除は隣り合うので、見た目より大きい当たり判定（.hit-44）にすると互いに
+             重なり、ピンの右端を押すと削除が反応する。実寸を40px幅にし、負のマージンで行の高さは保つ -->
+        <span class="flex items-center shrink-0">
           ${visible
             ? `<button type="button" data-meters="${meters}" aria-pressed="${pinned ? 'true' : 'false'}" aria-label="${meters}mのピン留めを切り替え"
-                class="pin-distance-btn hit-44 relative w-7 h-7 flex items-center justify-center rounded-full ${pinned ? 'text-lime-600 dark:text-lime-400' : 'text-neutral-500 dark:text-neutral-500'} active:bg-neutral-100 dark:active:bg-neutral-800">
+                class="pin-distance-btn w-10 h-10 -my-1.5 flex items-center justify-center rounded-full ${pinned ? 'text-lime-600 dark:text-lime-400' : 'text-neutral-500 dark:text-neutral-500'} active:bg-neutral-100 dark:active:bg-neutral-800">
                 ${PIN_ICON}
               </button>`
-            : '<span class="w-7 h-7"></span>'}
+            : '<span class="w-10"></span>'}
           ${custom
             ? `<button type="button" data-meters="${meters}" aria-label="${meters}mを削除"
-                class="delete-distance-btn hit-44 relative w-7 h-7 flex items-center justify-center rounded-full text-neutral-500 dark:text-neutral-400 active:text-red-500 active:bg-neutral-100 dark:active:bg-neutral-800">
+                class="delete-distance-btn w-10 h-10 -my-1.5 flex items-center justify-center rounded-full text-neutral-500 dark:text-neutral-400 active:text-red-500 active:bg-neutral-100 dark:active:bg-neutral-800">
                 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-4 h-4">
                   <polyline points="3 6 5 6 21 6"></polyline>
                   <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
                 </svg>
               </button>`
-            : '<span class="w-7 h-7"></span>'}
+            : '<span class="w-10"></span>'}
         </span>
       `;
       modalList.appendChild(row);

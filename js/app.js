@@ -90,6 +90,11 @@
   // 入力後に9枚のカードが全部同じ顔になり、どれが自分の入力でどれが計算結果か
   // 分からなくなるのを防ぐためだけに持っている。
   let paceSource = null;
+  // フォーカス中の欄に、実際に打ち込みがあったか。フォーカスが外れたときの
+  // 再計算はこれが立っているときだけにする。計算結果の欄はセンチ秒・整数秒に
+  // 丸めて表示しているので、触れて離れただけでそこから引き直すと、入力元の
+  // タイムが丸め誤差の分だけ書き換わってしまう（10000m 41:23 → 41:20 など）。
+  let editedSinceFocus = false;
   let distances = loadDistances();
 
   // ---------- 距離リストの永続化 ----------
@@ -506,6 +511,13 @@
   function recalcFromPaceSummary() {
     const min = parseInt(paceMinInput.value, 10) || 0;
     const sec = parseInt(paceSecInput.value, 10) || 0;
+    if (min === 0 && sec === 0) {
+      // 0'00" はペースとして意味を持たないので「未入力」に戻す。0として扱うと
+      // 両方消したときに全カードが 00:00 で埋まる（秒欄は離れた時点で 00 に整形されるので、
+      // 空欄かどうかではなく値で判定する）
+      clearPace();
+      return;
+    }
     currentPace = min * 60 + sec; // s/km == ms/m
     paceSource = 'pace';
     updateSourceHighlight();
@@ -520,9 +532,13 @@
     if (digits.length > maxLen) digits = digits.slice(0, maxLen);
     if (digits !== input.value) input.value = digits;
 
+    editedSinceFocus = true;
     recalcFromPaceSummary();
 
-    if (input === paceMinInput && digits.length === 2) {
+    // ランナーのペースはほぼ「分」が1桁（3〜7分台）なので、2〜9が来た時点で秒へ送る。
+    // 2桁を待つと「4→3→0」が 43'0" になる。1 と 0 だけは 10分台・05 のように続く
+    // 可能性があるので2桁目を待つ。20分/km以上は1000mのカードから入れてもらう
+    if (input === paceMinInput && (digits.length === 2 || (digits.length === 1 && digits >= '2'))) {
       paceSecInput.focus();
       paceSecInput.select();
     }
@@ -538,6 +554,15 @@
 
   function onPaceSummaryFocusOut(e) {
     const input = e.target;
+    if (!editedSinceFocus) {
+      // 触れただけなら表示の整形だけして、ペースは引き直さない
+      updatePaceSummaryFields();
+      return;
+    }
+    if (currentPace === null) {
+      updatePaceSummaryFields();
+      return;
+    }
     if (input === paceSecInput) {
       const v = clampUnitValue('mm', parseInt(input.value, 10));
       input.value = pad2(v);
@@ -549,6 +574,7 @@
   }
 
   function onPaceSummaryFocusIn(e) {
+    editedSinceFocus = false;
     e.target.select();
   }
 
@@ -781,6 +807,7 @@
     if (digits.length > 2) digits = digits.slice(0, 2);
     if (digits !== input.value) input.value = digits;
 
+    editedSinceFocus = true;
     recalcFrom(distance);
 
     // 2桁入力されたら自動的に右隣の欄へフォーカス移動
@@ -816,6 +843,11 @@
     if (!input.classList.contains('pace-input')) return;
     const distance = Number(input.dataset.distance);
     const unit = input.dataset.unit;
+    if (!editedSinceFocus) {
+      // 自動で送られてきて何も打たずに離れた空欄は、値（0扱い）は変えずに見た目だけ 00 にそろえる
+      if (input.value === '' && currentPace !== null) setFieldValue(distance, unit, 0);
+      return;
+    }
     const value = clampUnitValue(unit, parseInt(input.value, 10));
     setFieldValue(distance, unit, value);
     recalcFrom(distance);
@@ -824,10 +856,12 @@
   function onFocusIn(e) {
     const input = e.target;
     if (!input.classList.contains('pace-input')) return;
+    editedSinceFocus = false;
     input.select();
   }
 
-  function resetAll() {
+  // ペースを未入力に戻し、全カードを空にする（フォーカスはそのまま）
+  function clearPace() {
     currentPace = null;
     paceSource = null;
     updateSourceHighlight();
@@ -836,11 +870,19 @@
         getInput(meters, unit).value = '';
       });
     });
+    updateAllUnitVisibility();
+    updateDerivedInfo();
+  }
+
+  function resetAll() {
+    clearPace();
     // フォーカスを残したままだとモバイルで数字キーボードが開いたままになるため外す。
     // 桁の畳み直しより先に外す（活性中の欄は畳まれない仕様なので、後だと
     // 空になった「時」や「ms」が1つだけ残って見える）。
     const active = document.activeElement;
     if (active && (active.classList.contains('pace-input') || active.classList.contains('pace-summary-input'))) {
+      // 消した直後の欄から引き直されないよう、打ち込み済みの印も落としておく
+      editedSinceFocus = false;
       active.blur();
     }
     updateAllUnitVisibility();
